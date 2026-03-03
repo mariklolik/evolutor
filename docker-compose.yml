@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  evolutor:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - chromadb
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  sandbox:
+    image: python:3.11-slim
+    command: ["sleep", "infinity"]
+    volumes:
+      - /tmp/evolutor/sandbox:/workspace
+    network_mode: none
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+
+volumes:
+  chroma_data:
