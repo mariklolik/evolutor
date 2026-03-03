@@ -57,13 +57,17 @@ def history(n: int = typer.Option(10, "--count", "-n", help="Number of entries")
 @app.command()
 def chat() -> None:
     """Start interactive chat interface."""
-    typer.echo("Chat interface not yet available.")
+    import asyncio
+    from evolutor.cli.chat import ChatInterface
+    ci = ChatInterface()
+    asyncio.run(ci.run())
 
 
 @app.command()
 def tui() -> None:
     """Launch full-screen TUI dashboard."""
-    typer.echo("TUI not yet available.")
+    from evolutor.cli.tui import launch_tui
+    launch_tui()
 
 
 def main() -> None:

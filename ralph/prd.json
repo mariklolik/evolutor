@@ -360,49 +360,49 @@
       "id": "US-060",
       "title": "Config manager (cli/config.py)",
       "phase": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-061",
       "title": "CLI commands (cli/app.py)",
       "phase": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-062",
       "title": "Chat REPL (cli/chat.py)",
       "phase": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-063",
       "title": "Textual TUI (cli/tui.py)",
       "phase": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-064",
       "title": "Docker infrastructure (Dockerfile + compose)",
       "phase": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-065",
       "title": "Convenience scripts (scripts/)",
       "phase": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-066",
       "title": "End-to-end integration test",
       "phase": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-067",
       "title": "CLI integration tests",
       "phase": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-068",
