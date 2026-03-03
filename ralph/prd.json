@@ -234,73 +234,73 @@
       "id": "US-039",
       "title": "File operations tool (tools/builtin/file_ops.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-040",
       "title": "Bash tool (tools/builtin/bash.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-041",
       "title": "Git tool (tools/builtin/git_tool.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-042",
       "title": "Web tool (tools/builtin/web.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-043",
       "title": "MCP registry (tools/mcp/registry.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-044",
       "title": "Tool search (tools/mcp/tool_search.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-045",
       "title": "ToolForge creator/verifier/store",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-046",
       "title": "Orchestrator state model (orchestrator/models.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-047",
       "title": "Planner node (orchestrator/planner.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-048",
       "title": "Worker node (orchestrator/worker.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-049",
       "title": "Critic node + engine (orchestrator/critic.py + engine.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-050",
       "title": "Scheduler + parallelism (orchestrator/scheduler.py + parallelism.py)",
       "phase": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-051",
