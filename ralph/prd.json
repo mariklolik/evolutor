@@ -306,55 +306,55 @@
       "id": "US-051",
       "title": "MAP-Elites archive (evolution/archive.py)",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-052",
       "title": "Fitness evaluator NSGA-III (evolution/fitness.py)",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-053",
       "title": "Mutation operator (evolution/mutator.py)",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-054",
       "title": "Main evolution loop (evolution/loop.py)",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-055",
       "title": "Plateau detector (evolution/plateau.py)",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-056",
       "title": "Canary deployer (evolution/canary.py)",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-057",
       "title": "Knowledge extraction (evolution/knowledge.py)",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-058",
       "title": "Agent prompt templates (prompts/)",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-059",
       "title": "Unit tests: evolution",
       "phase": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-060",
