@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 
 import pygit2
@@ -31,23 +30,16 @@ class AuditLog:
 
     def record_action(self, commit_sha: str, entry: AuditEntry) -> None:
         entry.commit_sha = commit_sha
-        oid = pygit2.Oid(hex=commit_sha)
         existing = ""
         try:
-            note = self.repo.notes.get(oid, NOTES_REF)
-            if note:
-                existing = note.message + "\n"
-        except Exception:
+            note = self.repo.lookup_note(commit_sha, NOTES_REF)
+            existing = note.message + "\n"
+        except KeyError:
             pass
         note_text = existing + entry.model_dump_json()
-        try:
-            self.repo.notes.create(
-                self._sig, self._sig, note_text, oid, NOTES_REF, force=True,
-            )
-        except Exception:
-            self.repo.notes.create(
-                self._sig, self._sig, note_text, oid, NOTES_REF,
-            )
+        self.repo.create_note(
+            note_text, self._sig, self._sig, commit_sha, NOTES_REF, True,
+        )
         logger.info("audit_recorded", action=entry.action, commit=commit_sha)
 
     def get_history(self, max_count: int = 50) -> list[AuditEntry]:
@@ -56,27 +48,7 @@ class AuditLog:
             return entries
         for commit in self.repo.walk(self.repo.head.target, pygit2.GIT_SORT_TIME):
             try:
-                note = self.repo.notes.get(commit.id, NOTES_REF)
-                if note:
-                    for line in note.message.strip().split("\n"):
-                        line = line.strip()
-                        if line:
-                            try:
-                                entries.append(AuditEntry.model_validate_json(line))
-                            except Exception:
-                                continue
-            except Exception:
-                continue
-            if len(entries) >= max_count:
-                break
-        return entries
-
-    def get_actions_for_commit(self, commit_sha: str) -> list[AuditEntry]:
-        oid = pygit2.Oid(hex=commit_sha)
-        entries: list[AuditEntry] = []
-        try:
-            note = self.repo.notes.get(oid, NOTES_REF)
-            if note:
+                note = self.repo.lookup_note(str(commit.id), NOTES_REF)
                 for line in note.message.strip().split("\n"):
                     line = line.strip()
                     if line:
@@ -84,6 +56,23 @@ class AuditLog:
                             entries.append(AuditEntry.model_validate_json(line))
                         except Exception:
                             continue
-        except Exception:
+            except KeyError:
+                continue
+            if len(entries) >= max_count:
+                break
+        return entries
+
+    def get_actions_for_commit(self, commit_sha: str) -> list[AuditEntry]:
+        entries: list[AuditEntry] = []
+        try:
+            note = self.repo.lookup_note(commit_sha, NOTES_REF)
+            for line in note.message.strip().split("\n"):
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(AuditEntry.model_validate_json(line))
+                    except Exception:
+                        continue
+        except KeyError:
             pass
         return entries

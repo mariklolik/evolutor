@@ -120,7 +120,7 @@
       "id": "US-020",
       "title": "Unit tests: git + kernel",
       "phase": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-021",
