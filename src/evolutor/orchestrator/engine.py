@@ -35,20 +35,25 @@ class OrchestratorEngine:
             "final_result": None,
         }
 
-        # Plan
-        state = await self.planner(state)
+        try:
+            # Plan
+            state = await self.planner(state)
 
-        # Execute loop
-        while state.get("should_continue", False):
-            state = await self.worker(state)
-            state = await self.critic(state)
+            # Execute loop
+            while state.get("should_continue", False):
+                state = await self.worker(state)
+                state = await self.critic(state)
 
-            if state.get("iteration", 0) >= max_iterations:
-                break
+                if state.get("iteration", 0) >= max_iterations:
+                    break
 
-        result = state.get("final_result")
-        if result is None:
-            result = TaskResult(task_id=task.id, success=False, error="No result produced")
+            result = state.get("final_result")
+            if result is None:
+                result = TaskResult(task_id=task.id, success=False, error="No result produced")
+
+        except Exception as e:
+            logger.error("orchestrator_error", task=task.title, error=str(e), exc_info=True)
+            result = TaskResult(task_id=task.id, success=False, error=str(e))
 
         logger.info("orchestrator_done", task=task.title, success=result.success)
         return result

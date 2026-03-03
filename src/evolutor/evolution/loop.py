@@ -40,36 +40,45 @@ class EvolutionLoop:
         report = EvolutionReport()
 
         for gen in range(generations):
-            # Ask: generate mutation
-            mutation = self.mutator.generate_mutation(["src/"], f"generation {gen}")
-            report.total_mutations += 1
+            try:
+                # Ask: generate mutation
+                mutation = self.mutator.generate_mutation(["src/"], f"generation {gen}")
+                report.total_mutations += 1
 
-            # Evaluate: compute fitness (placeholder)
-            fitness = FitnessVector(
-                test_pass_rate=0.9 + (gen * 0.01),
-                coverage=0.7 + (gen * 0.02),
-                complexity=0.5 - (gen * 0.01),
-                security_score=0.95,
-            )
+                # Evaluate: compute fitness (placeholder)
+                fitness = FitnessVector(
+                    test_pass_rate=0.9 + (gen * 0.01),
+                    coverage=0.7 + (gen * 0.02),
+                    complexity=0.5 - (gen * 0.01),
+                    security_score=0.95,
+                )
 
-            # Tell: add to archive
-            behavior = [min(fitness.coverage, 1.0), min(1.0 - fitness.complexity, 1.0)]
-            self.archive.add(
-                solution_id=f"gen-{gen}",
-                fitness=fitness.test_pass_rate + fitness.coverage,
-                behavior=behavior,
-            )
+                # Tell: add to archive
+                behavior = [min(fitness.coverage, 1.0), min(1.0 - fitness.complexity, 1.0)]
+                self.archive.add(
+                    solution_id=f"gen-{gen}",
+                    fitness=fitness.test_pass_rate + fitness.coverage,
+                    behavior=behavior,
+                )
 
-            # Check plateau
-            self.plateau_detector.record(fitness.test_pass_rate + fitness.coverage)
-            if self.plateau_detector.detect():
-                report.plateaus_detected += 1
-                logger.info("plateau_detected", generation=gen)
+                # Check plateau
+                self.plateau_detector.record(fitness.test_pass_rate + fitness.coverage)
+                if self.plateau_detector.detect():
+                    report.plateaus_detected += 1
+                    logger.info("plateau_detected", generation=gen)
 
-            report.generations_completed = gen + 1
+                report.generations_completed = gen + 1
+            except Exception as e:
+                logger.error("evolution_generation_error", generation=gen, error=str(e), exc_info=True)
+                report.generations_completed = gen + 1
+                continue
 
-        stats = self.archive.get_stats()
-        report.best_fitness = stats.best_fitness
-        report.archive_coverage = stats.coverage
+        try:
+            stats = self.archive.get_stats()
+            report.best_fitness = stats.best_fitness
+            report.archive_coverage = stats.coverage
+        except Exception as e:
+            logger.error("evolution_stats_error", error=str(e), exc_info=True)
+
         logger.info("evolution_complete", report=report.model_dump())
         return report

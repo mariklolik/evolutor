@@ -39,6 +39,8 @@ dependencies = [
     "pytest-benchmark>=4.0",
     # Sandbox
     "docker>=6.0",
+    # LLM client
+    "anthropic>=0.40",
     # Orchestration
     "langgraph>=0.1",
     "redis>=5.0",

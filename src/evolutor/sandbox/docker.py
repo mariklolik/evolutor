@@ -36,6 +36,13 @@ class SandboxManager:
         self._instances: dict[str, SandboxInstance] = {}
         self._client = None
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.cleanup_all()
+        return False
+
     def _get_client(self):
         if self._client is None:
             try:

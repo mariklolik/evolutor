@@ -97,6 +97,36 @@ class InvariantRegistry:
             description="Configuration must remain valid",
             check=_check_config_valid,
         ))
+        self.register(Invariant(
+            name="tests_must_not_regress",
+            description="Test count must not decrease",
+            check=_check_tests_must_not_regress,
+        ))
+        self.register(Invariant(
+            name="coverage_floor",
+            description="Coverage must stay above minimum threshold",
+            check=_check_coverage_floor,
+        ))
+        self.register(Invariant(
+            name="no_new_security_issues",
+            description="No new security issues from static analysis",
+            check=_check_no_new_security_issues,
+        ))
+        self.register(Invariant(
+            name="kernel_immutability_sha",
+            description="Kernel file SHA checksums must not change",
+            check=_check_kernel_immutability_sha,
+        ))
+        self.register(Invariant(
+            name="type_check_must_pass",
+            description="Type checking must pass with zero errors",
+            check=_check_type_check_must_pass,
+        ))
+        self.register(Invariant(
+            name="no_deleted_public_api",
+            description="Public API symbols must not be removed",
+            check=_check_no_deleted_public_api,
+        ))
 
 
 def _check_tests_must_pass(ctx: dict[str, Any]) -> InvariantViolation | None:
@@ -138,5 +168,76 @@ def _check_config_valid(ctx: dict[str, Any]) -> InvariantViolation | None:
         return InvariantViolation(
             invariant_name="config_valid",
             message=f"Config validation failed: {config_error}",
+        )
+    return None
+
+
+def _check_tests_must_not_regress(ctx: dict[str, Any]) -> InvariantViolation | None:
+    before_count = ctx.get("test_count_before", 0)
+    after_count = ctx.get("test_count_after", 0)
+    if before_count > 0 and after_count < before_count:
+        return InvariantViolation(
+            invariant_name="tests_must_not_regress",
+            message=f"Test count decreased from {before_count} to {after_count}",
+            details={"before": before_count, "after": after_count},
+        )
+    return None
+
+
+def _check_coverage_floor(ctx: dict[str, Any]) -> InvariantViolation | None:
+    coverage = ctx.get("coverage_percent", 100.0)
+    floor = ctx.get("coverage_floor", 60.0)
+    if coverage < floor:
+        return InvariantViolation(
+            invariant_name="coverage_floor",
+            message=f"Coverage {coverage:.1f}% below floor {floor:.1f}%",
+            details={"coverage": coverage, "floor": floor},
+        )
+    return None
+
+
+def _check_no_new_security_issues(ctx: dict[str, Any]) -> InvariantViolation | None:
+    new_issues = ctx.get("new_security_issues", [])
+    if new_issues:
+        return InvariantViolation(
+            invariant_name="no_new_security_issues",
+            message=f"{len(new_issues)} new security issue(s) found",
+            details={"issues": new_issues},
+        )
+    return None
+
+
+def _check_kernel_immutability_sha(ctx: dict[str, Any]) -> InvariantViolation | None:
+    expected_shas = ctx.get("kernel_file_shas", {})
+    actual_shas = ctx.get("kernel_file_shas_after", {})
+    for path, expected in expected_shas.items():
+        actual = actual_shas.get(path)
+        if actual and actual != expected:
+            return InvariantViolation(
+                invariant_name="kernel_immutability_sha",
+                message=f"Kernel file SHA changed: {path}",
+                details={"path": path, "expected": expected, "actual": actual},
+            )
+    return None
+
+
+def _check_type_check_must_pass(ctx: dict[str, Any]) -> InvariantViolation | None:
+    type_errors = ctx.get("type_check_errors", 0)
+    if type_errors > 0:
+        return InvariantViolation(
+            invariant_name="type_check_must_pass",
+            message=f"Type checking found {type_errors} error(s)",
+            details={"error_count": type_errors},
+        )
+    return None
+
+
+def _check_no_deleted_public_api(ctx: dict[str, Any]) -> InvariantViolation | None:
+    deleted_symbols = ctx.get("deleted_public_symbols", [])
+    if deleted_symbols:
+        return InvariantViolation(
+            invariant_name="no_deleted_public_api",
+            message=f"Public API symbols removed: {', '.join(deleted_symbols[:5])}",
+            details={"deleted": deleted_symbols},
         )
     return None
