@@ -66,25 +66,25 @@
       "id": "US-011",
       "title": "Worktree manager (git/worktree.py)",
       "phase": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-012",
       "title": "Branch strategy (git/branching.py)",
       "phase": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-013",
       "title": "Conflict resolution (git/conflict.py)",
       "phase": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-014",
       "title": "Audit trail (git/audit.py)",
       "phase": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-015",

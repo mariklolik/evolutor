@@ -36,11 +36,22 @@ if ! command -v claude &> /dev/null; then
   exit 1
 fi
 
+# Load user config (LiteLLM, API keys) — never hardcoded in script
+ENV_FILE="$SCRIPT_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+  echo "Loaded env from $ENV_FILE"
+fi
+
 echo "================================================================"
 echo "  Ralph — Evolutor Framework Builder"
 echo "  Model: $MODEL"
 echo "  Max iterations: $MAX_ITERATIONS"
 echo "  PRD: $PRD_FILE"
+echo "  LiteLLM: ${ANTHROPIC_BASE_URL:-not set}"
 echo "================================================================"
 
 # Show initial status
