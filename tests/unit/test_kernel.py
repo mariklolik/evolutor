@@ -76,6 +76,65 @@ class TestInvariantRegistry:
         report = reg.check_all({})
         assert report.passed
 
+    def test_new_invariants_registered(self):
+        reg = InvariantRegistry()
+        names = reg.list_invariants()
+        assert "tests_must_not_regress" in names
+        assert "coverage_floor" in names
+        assert "no_new_security_issues" in names
+        assert "kernel_immutability_sha" in names
+        assert "type_check_must_pass" in names
+        assert "no_deleted_public_api" in names
+
+    def test_tests_must_not_regress_violation(self):
+        reg = InvariantRegistry()
+        report = reg.check_all({"test_count_before": 50, "test_count_after": 45})
+        assert not report.passed
+        assert any(v.invariant_name == "tests_must_not_regress" for v in report.violations)
+
+    def test_tests_must_not_regress_passes(self):
+        reg = InvariantRegistry()
+        report = reg.check_all({"test_count_before": 50, "test_count_after": 55})
+        assert not any(v.invariant_name == "tests_must_not_regress" for v in report.violations)
+
+    def test_coverage_floor_violation(self):
+        reg = InvariantRegistry()
+        report = reg.check_all({"coverage_percent": 40.0, "coverage_floor": 60.0})
+        assert not report.passed
+        assert any(v.invariant_name == "coverage_floor" for v in report.violations)
+
+    def test_coverage_floor_passes(self):
+        reg = InvariantRegistry()
+        report = reg.check_all({"coverage_percent": 80.0, "coverage_floor": 60.0})
+        assert not any(v.invariant_name == "coverage_floor" for v in report.violations)
+
+    def test_no_new_security_issues_violation(self):
+        reg = InvariantRegistry()
+        report = reg.check_all({"new_security_issues": ["SQL injection in query.py"]})
+        assert not report.passed
+        assert any(v.invariant_name == "no_new_security_issues" for v in report.violations)
+
+    def test_kernel_immutability_sha_violation(self):
+        reg = InvariantRegistry()
+        report = reg.check_all({
+            "kernel_file_shas": {"kernel/safety.py": "abc123"},
+            "kernel_file_shas_after": {"kernel/safety.py": "def456"},
+        })
+        assert not report.passed
+        assert any(v.invariant_name == "kernel_immutability_sha" for v in report.violations)
+
+    def test_type_check_must_pass_violation(self):
+        reg = InvariantRegistry()
+        report = reg.check_all({"type_check_errors": 5})
+        assert not report.passed
+        assert any(v.invariant_name == "type_check_must_pass" for v in report.violations)
+
+    def test_no_deleted_public_api_violation(self):
+        reg = InvariantRegistry()
+        report = reg.check_all({"deleted_public_symbols": ["MyClass", "my_function"]})
+        assert not report.passed
+        assert any(v.invariant_name == "no_deleted_public_api" for v in report.violations)
+
 
 class TestEvaluator:
     def test_evaluate_passes(self):

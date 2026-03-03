@@ -426,7 +426,7 @@
       "id": "US-071",
       "title": "Finalize kernel invariants",
       "phase": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-072",
