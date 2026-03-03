@@ -414,7 +414,7 @@
       "id": "US-069",
       "title": "Performance benchmarks",
       "phase": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-070",
