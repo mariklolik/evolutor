@@ -186,49 +186,49 @@
       "id": "US-031",
       "title": "Knowledge graph (memory/knowledge_graph.py)",
       "phase": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-032",
       "title": "Repo map (memory/repo_map.py)",
       "phase": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-033",
       "title": "Git memory (memory/git_memory.py)",
       "phase": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-034",
       "title": "Playbooks with ACE pattern (memory/playbooks.py)",
       "phase": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-035",
       "title": "Scratchpad (memory/scratchpad.py)",
       "phase": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-036",
       "title": "Persistent memory (memory/persistent.py)",
       "phase": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-037",
       "title": "Seed playbook files",
       "phase": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-038",
       "title": "Unit tests: memory",
       "phase": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-039",
