@@ -54,7 +54,7 @@
       "id": "US-009",
       "title": "Config files and boilerplate",
       "phase": 0,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-010",
