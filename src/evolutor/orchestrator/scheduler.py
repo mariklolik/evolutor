@@ -33,13 +33,16 @@ class TaskScheduler:
             return None
 
     async def enqueue(self, task_data: dict) -> str:
-        r = await self._get_redis()
-        if r:
-            msg_id = await r.xadd(self.stream_name, {"data": json.dumps(task_data)})
-            return msg_id.decode() if isinstance(msg_id, bytes) else str(msg_id)
-        if self._fallback_queue is not None:
-            await self._fallback_queue.put(task_data)
-            return f"local-{self._fallback_queue.qsize()}"
+        try:
+            r = await self._get_redis()
+            if r:
+                msg_id = await r.xadd(self.stream_name, {"data": json.dumps(task_data)})
+                return msg_id.decode() if isinstance(msg_id, bytes) else str(msg_id)
+            if self._fallback_queue is not None:
+                await self._fallback_queue.put(task_data)
+                return f"local-{self._fallback_queue.qsize()}"
+        except Exception as e:
+            logger.error("enqueue_error", error=str(e), exc_info=True)
         return ""
 
     async def dequeue(self, consumer_group: str = "workers", consumer_name: str = "w1") -> dict | None:
@@ -66,6 +69,9 @@ class TaskScheduler:
         return None
 
     async def acknowledge(self, msg_id: str, consumer_group: str = "workers") -> None:
-        r = await self._get_redis()
-        if r:
-            await r.xack(self.stream_name, consumer_group, msg_id)
+        try:
+            r = await self._get_redis()
+            if r:
+                await r.xack(self.stream_name, consumer_group, msg_id)
+        except Exception as e:
+            logger.error("acknowledge_error", msg_id=msg_id, error=str(e), exc_info=True)

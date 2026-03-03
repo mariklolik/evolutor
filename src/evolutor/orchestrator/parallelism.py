@@ -22,9 +22,13 @@ class ParallelRunner:
     async def run_tasks(self, tasks: list[Task]) -> list[TaskResult]:
         async def _run_one(task: Task) -> TaskResult:
             async with self._semaphore:
-                engine = OrchestratorEngine()
-                return await engine.run(task)
+                try:
+                    engine = OrchestratorEngine()
+                    return await engine.run(task)
+                except Exception as e:
+                    logger.error("parallel_task_error", task=task.title, error=str(e), exc_info=True)
+                    return TaskResult(task_id=task.id, success=False, error=str(e))
 
-        results = await asyncio.gather(*[_run_one(t) for t in tasks])
+        results = await asyncio.gather(*[_run_one(t) for t in tasks], return_exceptions=False)
         logger.info("parallel_run_complete", total=len(tasks), succeeded=sum(1 for r in results if r.success))
         return list(results)

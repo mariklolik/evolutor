@@ -28,28 +28,37 @@ class CriticNode:
             return state
 
         last_result = results[-1]
-        decision = self._decide(last_result, state)
 
-        if decision == CriticDecision.accept:
-            plan = state.get("plan", [])
-            idx = state.get("current_subtask_index", 0)
-            if idx >= len(plan):
-                state["should_continue"] = False
-                state["final_result"] = last_result
+        try:
+            decision = self._decide(last_result, state)
+
+            if decision == CriticDecision.accept:
+                plan = state.get("plan", [])
+                idx = state.get("current_subtask_index", 0)
+                if idx >= len(plan):
+                    state["should_continue"] = False
+                    state["final_result"] = last_result
+                else:
+                    state["should_continue"] = True
+            elif decision == CriticDecision.revise:
+                state["current_subtask_index"] = max(0, state.get("current_subtask_index", 1) - 1)
+                iteration = state.get("iteration", 0) + 1
+                state["iteration"] = iteration
+                state["should_continue"] = iteration < state.get("max_iterations", 10)
             else:
-                state["should_continue"] = True
-        elif decision == CriticDecision.revise:
-            state["current_subtask_index"] = max(0, state.get("current_subtask_index", 1) - 1)
-            iteration = state.get("iteration", 0) + 1
-            state["iteration"] = iteration
-            state["should_continue"] = iteration < state.get("max_iterations", 10)
-        else:
+                state["should_continue"] = False
+                state["final_result"] = TaskResult(
+                    task_id=last_result.task_id, success=False, error="Rejected by critic",
+                )
+
+            logger.info("critic_decision", decision=decision.value)
+        except Exception as e:
+            logger.error("critic_error", error=str(e), exc_info=True)
             state["should_continue"] = False
             state["final_result"] = TaskResult(
-                task_id=last_result.task_id, success=False, error="Rejected by critic",
+                task_id=last_result.task_id, success=False, error=f"Critic error: {e}",
             )
 
-        logger.info("critic_decision", decision=decision.value)
         return state
 
     def _decide(self, result: TaskResult, state: OrchestratorState) -> CriticDecision:

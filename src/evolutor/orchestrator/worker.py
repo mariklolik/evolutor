@@ -27,12 +27,18 @@ class WorkerNode:
         subtask.status = TaskStatus.in_progress
         logger.info("worker_executing", subtask=subtask.title)
 
-        # In production, this uses tools/LLM to execute the subtask
-        result = TaskResult(
-            task_id=subtask.id,
-            success=True,
-        )
-        subtask.status = TaskStatus.completed
+        try:
+            # In production, this uses tools/LLM to execute the subtask
+            result = TaskResult(
+                task_id=subtask.id,
+                success=True,
+            )
+            subtask.status = TaskStatus.completed
+        except Exception as e:
+            logger.error("worker_error", subtask=subtask.title, error=str(e), exc_info=True)
+            result = TaskResult(task_id=subtask.id, success=False, error=str(e))
+            subtask.status = TaskStatus.failed
+
         results = state.get("results", [])
         results.append(result)
         state["results"] = results
