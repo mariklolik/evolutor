@@ -180,7 +180,7 @@
       "id": "US-030",
       "title": "Unit tests: sandbox + verification",
       "phase": 2,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-031",
