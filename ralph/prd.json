@@ -444,7 +444,7 @@
       "id": "US-074",
       "title": "Comprehensive scenario tests",
       "phase": 7,
-      "passes": false
+      "passes": true
     }
   ]
 }
