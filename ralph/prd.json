@@ -24,31 +24,31 @@
       "id": "US-004",
       "title": "Config types (types/config.py)",
       "phase": 0,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-005",
       "title": "Task types (types/task.py)",
       "phase": 0,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-006",
       "title": "Agent types (types/agent.py)",
       "phase": 0,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-007",
       "title": "Metrics types (types/metrics.py)",
       "phase": 0,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-008",
       "title": "Memory types (types/memory.py)",
       "phase": 0,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-009",
