@@ -2,3 +2,4 @@
 Started: Tue Mar  3 10:22:04 PM MSK 2026
 ---
 DONE: US-001: Create pyproject.toml (2026-03-03 22:44)
+DONE: US-002: Create package skeleton (2026-03-03 22:46)

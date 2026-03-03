@@ -12,7 +12,7 @@
       "id": "US-002",
       "title": "Create package skeleton",
       "phase": 0,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-003",
