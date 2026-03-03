@@ -408,7 +408,7 @@
       "id": "US-068",
       "title": "Documentation (docs/)",
       "phase": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-069",
