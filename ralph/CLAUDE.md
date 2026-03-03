@@ -2,6 +2,20 @@
 
 You are building the **Evolutor** framework. Working directory: `/home/mekashirskiy/evolutor`
 
+## LLM Access (user config — never hardcode these values in source files)
+
+The following environment variables are available for LLM calls within the Evolutor framework.
+Use them in `configs/models.toml` and any place the framework needs to call an LLM:
+
+- `ANTHROPIC_BASE_URL` — LiteLLM proxy endpoint (set in ralph/.env)
+- `ANTHROPIC_API_KEY` — LiteLLM API key (set in ralph/.env)
+- `LITELLM_BASE_URL` — same proxy, for direct litellm client usage
+- `LITELLM_API_KEY` — same key
+
+When writing code that calls LLMs (orchestrator, planner, worker, etc.) always read these from
+environment variables using `os.environ.get("ANTHROPIC_BASE_URL")` etc. — never hardcode URLs or keys.
+For the `anthropic` SDK, set `base_url` and `api_key` from env. For `litellm`, set `api_base` from env.
+
 ---
 
 ## MANDATORY LOOP — follow these steps in order, every single iteration
