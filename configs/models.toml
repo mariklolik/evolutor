@@ -1,0 +1,19 @@
+[planner]
+model = "claude-opus-4-6"
+temperature = 0.3
+max_tokens = 4096
+
+[worker]
+model = "claude-sonnet-4-6"
+temperature = 0.5
+max_tokens = 8192
+
+[critic]
+model = "claude-sonnet-4-6"
+temperature = 0.2
+max_tokens = 2048
+
+[meta_improver]
+model = "claude-opus-4-6"
+temperature = 0.7
+max_tokens = 4096

@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "evolutor"
+version = "0.1.0"
+description = "A self-driving, self-improving codebase framework"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    # Core
+    "pydantic>=2.0",
+    "structlog>=23.0",
+    "httpx>=0.25",
+    "typer[all]>=0.9",
+    "rich>=13.0",
+    # Git
+    "pygit2>=1.15",
+    "dulwich>=0.21",
+    "githubkit>=0.11",
+    # Memory
+    "mem0ai>=0.1",
+    "chromadb>=0.4",
+    "networkx>=3.0",
+    "tree-sitter>=0.20",
+    "tree-sitter-languages>=1.8",
+    # Evolution
+    "ribs>=0.6",
+    "pymoo>=0.6",
+    "ruptures>=1.1",
+    # Verification
+    "hypothesis>=6.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+    "bandit>=1.7",
+    "radon>=6.0",
+    "coverage>=7.0",
+    "pytest-benchmark>=4.0",
+    # Sandbox
+    "docker>=6.0",
+    # Orchestration
+    "langgraph>=0.1",
+    "redis>=5.0",
+    # Templating
+    "jinja2>=3.0",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+    "pre-commit>=3.0",
+]
+
+[project.scripts]
+evolutor = "evolutor.cli.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/evolutor"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+warn_return_any = false
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

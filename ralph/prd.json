@@ -1,0 +1,450 @@
+{
+  "projectName": "evolutor",
+  "description": "Self-driving, self-improving codebase framework — 74 tasks across 8 phases",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create pyproject.toml",
+      "phase": 0,
+      "passes": true
+    },
+    {
+      "id": "US-002",
+      "title": "Create package skeleton",
+      "phase": 0,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Package entry points",
+      "phase": 0,
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Config types (types/config.py)",
+      "phase": 0,
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "Task types (types/task.py)",
+      "phase": 0,
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Agent types (types/agent.py)",
+      "phase": 0,
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Metrics types (types/metrics.py)",
+      "phase": 0,
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Memory types (types/memory.py)",
+      "phase": 0,
+      "passes": false
+    },
+    {
+      "id": "US-009",
+      "title": "Config files and boilerplate",
+      "phase": 0,
+      "passes": false
+    },
+    {
+      "id": "US-010",
+      "title": "Core git operations (git/ops.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-011",
+      "title": "Worktree manager (git/worktree.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-012",
+      "title": "Branch strategy (git/branching.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-013",
+      "title": "Conflict resolution (git/conflict.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-014",
+      "title": "Audit trail (git/audit.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-015",
+      "title": "Invariant registry (kernel/invariants.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-016",
+      "title": "Kernel evaluator (kernel/evaluator.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-017",
+      "title": "Rollback manager (kernel/rollback.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-018",
+      "title": "Safety boundary (kernel/safety.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-019",
+      "title": "Trust scorer (kernel/trust.py)",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-020",
+      "title": "Unit tests: git + kernel",
+      "phase": 1,
+      "passes": false
+    },
+    {
+      "id": "US-021",
+      "title": "Docker sandbox manager (sandbox/docker.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-022",
+      "title": "Resource limiter (sandbox/resource.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-023",
+      "title": "Network policy (sandbox/network.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-024",
+      "title": "Snapshot manager (sandbox/snapshot.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-025",
+      "title": "Static analysis pipeline (verification/static.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-026",
+      "title": "Property-based testing (verification/property.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-027",
+      "title": "Adversarial testing (verification/adversarial.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-028",
+      "title": "Consensus verifier (verification/consensus.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-029",
+      "title": "Metrics collector (verification/metrics.py)",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-030",
+      "title": "Unit tests: sandbox + verification",
+      "phase": 2,
+      "passes": false
+    },
+    {
+      "id": "US-031",
+      "title": "Knowledge graph (memory/knowledge_graph.py)",
+      "phase": 3,
+      "passes": false
+    },
+    {
+      "id": "US-032",
+      "title": "Repo map (memory/repo_map.py)",
+      "phase": 3,
+      "passes": false
+    },
+    {
+      "id": "US-033",
+      "title": "Git memory (memory/git_memory.py)",
+      "phase": 3,
+      "passes": false
+    },
+    {
+      "id": "US-034",
+      "title": "Playbooks with ACE pattern (memory/playbooks.py)",
+      "phase": 3,
+      "passes": false
+    },
+    {
+      "id": "US-035",
+      "title": "Scratchpad (memory/scratchpad.py)",
+      "phase": 3,
+      "passes": false
+    },
+    {
+      "id": "US-036",
+      "title": "Persistent memory (memory/persistent.py)",
+      "phase": 3,
+      "passes": false
+    },
+    {
+      "id": "US-037",
+      "title": "Seed playbook files",
+      "phase": 3,
+      "passes": false
+    },
+    {
+      "id": "US-038",
+      "title": "Unit tests: memory",
+      "phase": 3,
+      "passes": false
+    },
+    {
+      "id": "US-039",
+      "title": "File operations tool (tools/builtin/file_ops.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-040",
+      "title": "Bash tool (tools/builtin/bash.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-041",
+      "title": "Git tool (tools/builtin/git_tool.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-042",
+      "title": "Web tool (tools/builtin/web.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-043",
+      "title": "MCP registry (tools/mcp/registry.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-044",
+      "title": "Tool search (tools/mcp/tool_search.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-045",
+      "title": "ToolForge creator/verifier/store",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-046",
+      "title": "Orchestrator state model (orchestrator/models.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-047",
+      "title": "Planner node (orchestrator/planner.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-048",
+      "title": "Worker node (orchestrator/worker.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-049",
+      "title": "Critic node + engine (orchestrator/critic.py + engine.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-050",
+      "title": "Scheduler + parallelism (orchestrator/scheduler.py + parallelism.py)",
+      "phase": 4,
+      "passes": false
+    },
+    {
+      "id": "US-051",
+      "title": "MAP-Elites archive (evolution/archive.py)",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-052",
+      "title": "Fitness evaluator NSGA-III (evolution/fitness.py)",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-053",
+      "title": "Mutation operator (evolution/mutator.py)",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-054",
+      "title": "Main evolution loop (evolution/loop.py)",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-055",
+      "title": "Plateau detector (evolution/plateau.py)",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-056",
+      "title": "Canary deployer (evolution/canary.py)",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-057",
+      "title": "Knowledge extraction (evolution/knowledge.py)",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-058",
+      "title": "Agent prompt templates (prompts/)",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-059",
+      "title": "Unit tests: evolution",
+      "phase": 5,
+      "passes": false
+    },
+    {
+      "id": "US-060",
+      "title": "Config manager (cli/config.py)",
+      "phase": 6,
+      "passes": false
+    },
+    {
+      "id": "US-061",
+      "title": "CLI commands (cli/app.py)",
+      "phase": 6,
+      "passes": false
+    },
+    {
+      "id": "US-062",
+      "title": "Chat REPL (cli/chat.py)",
+      "phase": 6,
+      "passes": false
+    },
+    {
+      "id": "US-063",
+      "title": "Textual TUI (cli/tui.py)",
+      "phase": 6,
+      "passes": false
+    },
+    {
+      "id": "US-064",
+      "title": "Docker infrastructure (Dockerfile + compose)",
+      "phase": 6,
+      "passes": false
+    },
+    {
+      "id": "US-065",
+      "title": "Convenience scripts (scripts/)",
+      "phase": 6,
+      "passes": false
+    },
+    {
+      "id": "US-066",
+      "title": "End-to-end integration test",
+      "phase": 6,
+      "passes": false
+    },
+    {
+      "id": "US-067",
+      "title": "CLI integration tests",
+      "phase": 6,
+      "passes": false
+    },
+    {
+      "id": "US-068",
+      "title": "Documentation (docs/)",
+      "phase": 7,
+      "passes": false
+    },
+    {
+      "id": "US-069",
+      "title": "Performance benchmarks",
+      "phase": 7,
+      "passes": false
+    },
+    {
+      "id": "US-070",
+      "title": "Error handling and resilience audit",
+      "phase": 7,
+      "passes": false
+    },
+    {
+      "id": "US-071",
+      "title": "Finalize kernel invariants",
+      "phase": 7,
+      "passes": false
+    },
+    {
+      "id": "US-072",
+      "title": "Self-bootstrap validation",
+      "phase": 7,
+      "passes": false
+    },
+    {
+      "id": "US-073",
+      "title": "CI/CD configuration",
+      "phase": 7,
+      "passes": false
+    },
+    {
+      "id": "US-074",
+      "title": "Comprehensive scenario tests",
+      "phase": 7,
+      "passes": false
+    }
+  ]
+}

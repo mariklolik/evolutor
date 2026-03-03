@@ -1,0 +1,19 @@
+[docker]
+image = "python:3.11-slim"
+mem_limit = "512m"
+cpu_period = 100000
+cpu_quota = 100000
+pids_limit = 256
+storage_size = "1G"
+timeout_seconds = 300
+
+[network]
+mode = "none"
+allowed_hosts = []
+block_outbound = true
+
+[resources]
+max_memory_mb = 512
+max_cpu_cores = 1
+max_pids = 256
+max_disk_mb = 1024

@@ -1,0 +1,45 @@
+[sandbox]
+image = "python:3.11-slim"
+mem_limit = "512m"
+cpu_period = 100000
+cpu_quota = 100000
+pids_limit = 256
+storage_size = "1G"
+timeout_seconds = 300
+network_mode = "none"
+
+[git]
+worktree_base = "/tmp/evolutor/worktrees"
+default_branch = "main"
+commit_author = "Evolutor <evolutor@localhost>"
+max_worktrees = 8
+
+[memory]
+chromadb_path = ".evolutor/chroma"
+graph_path = ".evolutor/knowledge_graph.json"
+playbooks_dir = "playbooks"
+scratchpad_max_entries = 1000
+mem0_api_key = ""
+use_local_mem0 = true
+
+[evolution]
+archive_dims = [20, 20]
+population_size = 10
+max_generations = 100
+migration_interval = 10
+plateau_window = 20
+canary_duration_seconds = 60
+mutation_types = ["refactor", "optimize", "harden", "simplify", "extend", "test_improve"]
+
+[orchestrator]
+max_parallel_workers = 4
+max_iterations = 10
+planner_model = "claude-opus-4-6"
+worker_model = "claude-sonnet-4-6"
+critic_model = "claude-sonnet-4-6"
+meta_improver_model = "claude-opus-4-6"
+redis_url = "redis://localhost:6379"
+
+log_level = "INFO"
+project_root = "."
+anthropic_api_key = ""
