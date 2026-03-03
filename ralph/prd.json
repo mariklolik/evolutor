@@ -60,7 +60,7 @@
       "id": "US-010",
       "title": "Core git operations (git/ops.py)",
       "phase": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-011",
