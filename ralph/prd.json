@@ -438,7 +438,7 @@
       "id": "US-073",
       "title": "CI/CD configuration",
       "phase": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-074",
