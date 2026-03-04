@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from enum import Enum
+from pathlib import Path
 
 import structlog
 from pydantic import BaseModel, Field
@@ -70,3 +71,100 @@ class Mutator:
         if "feature" in context_lower or "add" in context_lower:
             return MutationType.extend
         return random.choice(list(MutationType))
+
+    async def apply_mutation(
+        self, target_files: list[str], project_root: "Path", context: str = ""
+    ) -> dict[str, str]:
+        """Call LLM to generate real code changes. Returns {filepath: new_content}.
+
+        Based on DGM self_improve_step.py pattern: give LLM full file content + failure context,
+        get back modified files as JSON.
+        """
+        import os
+        import json
+        import re
+        import anthropic
+        from pathlib import Path
+
+        mutation = self.generate_mutation(target_files, context)
+        project_root = Path(project_root)
+
+        # Read target files (skip >40KB files)
+        file_contents: dict[str, str] = {}
+        for f in target_files[:3]:
+            p = project_root / f
+            if p.exists() and p.stat().st_size < 40_000:
+                file_contents[f] = p.read_text(errors="replace")
+
+        if not file_contents:
+            logger.warning("apply_mutation_no_readable_files", files=target_files)
+            return {}
+
+        # DGM-style prompt: include full code + mutation goal + rules
+        files_section = "\n\n".join(
+            f"### FILE: {k}\n```python\n{v}\n```" for k, v in file_contents.items()
+        )
+        prompt = (
+            f"## Mutation Goal\n{mutation.description}\n"
+            f"## Mutation Type\n{mutation.mutation_type.value}\n"
+            f"## Context\n{context}\n\n"
+            f"## Files to Modify\n{files_section}\n\n"
+            "## Instructions\n"
+            "Implement the mutation. Return ONLY a JSON object mapping filepath to complete new file content.\n"
+            'Example: {"src/foo.py": "# complete file content here\\n..."}\n'
+            "Rules:\n"
+            "1. Keep all existing imports and function signatures unless specifically changing them\n"
+            "2. Do not break existing test contracts\n"
+            "3. Make the smallest focused change that achieves the mutation goal\n"
+            "4. Return valid JSON only — no markdown fences, no explanation"
+        )
+
+        client = anthropic.Anthropic(
+            base_url=os.environ.get("ANTHROPIC_BASE_URL", "http://localhost:4000"),
+            api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-local"),
+        )
+
+        try:
+            resp = client.messages.create(
+                model=os.environ.get("EVOLUTOR_MODEL", "claude-sonnet-4-6"),
+                max_tokens=8192,
+                system=(
+                    "You are an expert Python developer implementing precise code mutations. "
+                    "Always return valid JSON only: {\"filepath\": \"complete file content\"}. "
+                    "No markdown, no explanation."
+                ),
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = resp.content[0].text.strip()
+            return self._extract_json_files(text)
+        except Exception as e:
+            logger.error("apply_mutation_llm_error", error=str(e))
+            return {}
+
+    def _extract_json_files(self, text: str) -> dict[str, str]:
+        """Robustly extract {filepath: content} JSON from LLM response."""
+        import json
+        import re
+        # Strip markdown fences
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            parts = text.split("```")
+            if len(parts) >= 3:
+                text = parts[1].strip()
+        # Try direct parse
+        try:
+            result = json.loads(text)
+            if isinstance(result, dict):
+                return {k: v for k, v in result.items() if isinstance(v, str)}
+        except json.JSONDecodeError:
+            pass
+        # Try to find JSON object
+        match = re.search(r'\{["\s]*"[^"]+"\s*:', text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(text[match.start():])
+            except Exception:
+                pass
+        logger.warning("apply_mutation_json_parse_failed", text_preview=text[:200])
+        return {}
