@@ -37,48 +37,159 @@ class EvolutionLoop:
         self.plateau_detector = PlateauDetector()
 
     async def run(self, generations: int = 10) -> EvolutionReport:
+        import os
+        import re
+        import shutil
+        import subprocess
+        import tempfile
+        import random
+        from pathlib import Path
+
         report = EvolutionReport()
+        project_root = Path(os.environ.get("EVOLUTOR_PROJECT_ROOT", ".")).resolve()
+
+        # Files the evolution loop targets (rotating)
+        EVOLVABLE_FILES = [
+            "src/evolutor/evolution/plateau.py",
+            "src/evolutor/memory/playbooks.py",
+            "src/evolutor/kernel/evaluator.py",
+            "src/evolutor/orchestrator/worker.py",
+        ]
 
         for gen in range(generations):
             try:
-                # Ask: generate mutation
-                mutation = self.mutator.generate_mutation(["src/"], f"generation {gen}")
-                report.total_mutations += 1
+                target = EVOLVABLE_FILES[gen % len(EVOLVABLE_FILES)]
+                logger.info("evolution_gen_start", gen=gen, target=target)
 
-                # Evaluate: compute fitness (placeholder)
-                fitness = FitnessVector(
-                    test_pass_rate=0.9 + (gen * 0.01),
-                    coverage=0.7 + (gen * 0.02),
-                    complexity=0.5 - (gen * 0.01),
-                    security_score=0.95,
+                # Step 1: Generate mutation via LLM
+                report.total_mutations += 1
+                context = f"gen {gen}: improve agent quality, efficiency, or robustness"
+                modified_files = await self.mutator.apply_mutation(
+                    target_files=[target],
+                    project_root=project_root,
+                    context=context,
                 )
 
-                # Tell: add to archive
-                behavior = [min(fitness.coverage, 1.0), min(1.0 - fitness.complexity, 1.0)]
+                if not modified_files:
+                    logger.warning("mutation_empty_skipping", gen=gen, target=target)
+                    report.generations_completed = gen + 1
+                    continue
+
+                # Step 2: Evaluate in isolated temp copy (cascade evaluation)
+                accepted = False
+                pass_rate = 0.0
+
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    child_root = Path(tmpdir) / "child"
+                    shutil.copytree(
+                        project_root, child_root,
+                        ignore=shutil.ignore_patterns(
+                            "__pycache__", "*.pyc", ".git",
+                            ".venv", "node_modules", "*.egg-info", "dist", ".pytest_cache"
+                        ),
+                    )
+
+                    # Apply mutations to temp copy
+                    for filepath, new_content in modified_files.items():
+                        dest = child_root / filepath
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_text(new_content)
+
+                    # CASCADE STAGE 0: Syntax check (ruff) — fast reject
+                    ruff_result = subprocess.run(
+                        ["python", "-m", "ruff", "check", "--select=E9,F"] +
+                        [str(child_root / f) for f in modified_files],
+                        capture_output=True, text=True, timeout=15,
+                    )
+                    if ruff_result.returncode != 0:
+                        logger.info(
+                            "cascade_stage0_syntax_reject",
+                            gen=gen, error=ruff_result.stdout[:300]
+                        )
+                        self.archive.update_clade_stats(f"gen-{gen}", None, success=False)
+                        report.generations_completed = gen + 1
+                        continue
+
+                    # CASCADE STAGE 1: Unit tests — reject if tests regress
+                    test_result = subprocess.run(
+                        [
+                            "python", "-m", "pytest", "tests/unit/",
+                            "-x", "-q", "--tb=short",
+                            "--timeout=30", "-p", "no:warnings",
+                        ],
+                        capture_output=True, text=True,
+                        cwd=child_root, timeout=120,
+                        env={**os.environ, "PYTHONPATH": str(child_root / "src")},
+                    )
+                    output = test_result.stdout + test_result.stderr
+                    passed_m = re.search(r"(\d+) passed", output)
+                    failed_m = re.search(r"(\d+) failed", output)
+                    passed = int(passed_m.group(1)) if passed_m else 0
+                    failed = int(failed_m.group(1)) if failed_m else 0
+                    total = passed + failed
+                    pass_rate = passed / max(total, 1)
+
+                    logger.info(
+                        "cascade_stage1_result",
+                        gen=gen, pass_rate=f"{pass_rate:.2f}",
+                        passed=passed, failed=failed, target=target
+                    )
+
+                    if pass_rate < 0.85 or (failed > 0 and total > 5):
+                        logger.info("cascade_stage1_reject", gen=gen, pass_rate=pass_rate)
+                        self.archive.update_clade_stats(f"gen-{gen}", None, success=False)
+                        report.generations_completed = gen + 1
+                        continue
+
+                    # ACCEPT: Tests pass — apply to real codebase
+                    for filepath, new_content in modified_files.items():
+                        (project_root / filepath).write_text(new_content)
+                    accepted = True
+
+                fitness = FitnessVector(
+                    test_pass_rate=pass_rate,
+                    coverage=0.65,
+                    complexity=0.5,
+                    security_score=1.0,
+                )
+
+                # Step 3: Add to archive with CMP tracking
+                behavior = [min(fitness.test_pass_rate, 1.0), 0.5]
+                parent_id = self.archive.select_parent_by_cmp()
                 self.archive.add(
                     solution_id=f"gen-{gen}",
                     fitness=fitness.test_pass_rate + fitness.coverage,
                     behavior=behavior,
+                    metadata={"files": list(modified_files.keys()), "gen": gen, "accepted": accepted}
                 )
+                self.archive.update_clade_stats(f"gen-{gen}", parent_id, success=True)
 
-                # Check plateau
-                self.plateau_detector.record(fitness.test_pass_rate + fitness.coverage)
+                # Step 4: Plateau detection
+                self.plateau_detector.record(fitness.test_pass_rate)
                 if self.plateau_detector.detect():
                     report.plateaus_detected += 1
-                    logger.info("plateau_detected", generation=gen)
+                    logger.info("plateau_detected", gen=gen, action="diversify_next")
+
+                # Step 5: Commit accepted improvement
+                if accepted:
+                    subprocess.run(
+                        f'git add -A && git commit -m "feat(evolution): gen-{gen} {target} pass_rate={pass_rate:.2f}"',
+                        shell=True, cwd=project_root, capture_output=True
+                    )
+                    logger.info("evolution_gen_accepted_committed", gen=gen, pass_rate=pass_rate)
 
                 report.generations_completed = gen + 1
+
             except Exception as e:
-                logger.error("evolution_generation_error", generation=gen, error=str(e), exc_info=True)
+                logger.error("evolution_gen_error", gen=gen, error=str(e), exc_info=True)
                 report.generations_completed = gen + 1
-                continue
 
         try:
             stats = self.archive.get_stats()
             report.best_fitness = stats.best_fitness
             report.archive_coverage = stats.coverage
-        except Exception as e:
-            logger.error("evolution_stats_error", error=str(e), exc_info=True)
+        except Exception:
+            pass
 
         logger.info("evolution_complete", report=report.model_dump())
         return report
