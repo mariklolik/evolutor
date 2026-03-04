@@ -1,0 +1,35 @@
+model_list:
+  # Maps claude-sonnet-4-6 → Qwen3-Coder-30B-FP8 (quality worker)
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: openai/qwen3-coder-30b
+      api_base: http://localhost:8000/v1
+      api_key: "dummy-local"
+  # Maps claude-opus-4-6 → same Qwen3-30B (our best local model)
+  - model_name: claude-opus-4-6
+    litellm_params:
+      model: openai/qwen3-coder-30b
+      api_base: http://localhost:8000/v1
+      api_key: "dummy-local"
+  # Maps claude-haiku → Qwen3-8B (fast/cheap for cascade stages 0-1)
+  - model_name: claude-haiku-4-5
+    litellm_params:
+      model: openai/qwen3-8b
+      api_base: http://localhost:8001/v1
+      api_key: "dummy-local"
+  # Planner uses different model (SAGE cross-LLM insight: different model = better plans)
+  - model_name: planner-model
+    litellm_params:
+      model: openai/qwen3-8b
+      api_base: http://localhost:8001/v1
+      api_key: "dummy-local"
+
+litellm_settings:
+  drop_params: true
+  num_retries: 3
+  request_timeout: 180
+  fallback_models:
+    - claude-haiku-4-5
+
+general_settings:
+  master_key: "sk-local"
