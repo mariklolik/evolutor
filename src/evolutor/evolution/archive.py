@@ -113,5 +113,69 @@ class EvolutionArchive:
             mean_fitness=sum(fitnesses) / len(fitnesses),
         )
 
+    def select_parent_by_cmp(self) -> str | None:
+        """HGM Clade-Metaproductivity: Thompson sampling Beta(1+wins, 1+losses).
+
+        Ref: HGM paper §3.2 Algorithm 1 — θ_a ~ Beta(1+n_success^Clade(a), 1+n_failure^Clade(a))
+        Selects agents by evolutionary fertility (future improvement potential), not current score.
+        """
+        try:
+            import numpy as np
+        except ImportError:
+            return None
+
+        if not hasattr(self, "_clade"):
+            self._clade: dict[str, dict] = {}
+
+        entries = getattr(self, "_entries", [])
+        if not entries:
+            # Try ribs archive
+            if self._archive is not None:
+                try:
+                    df = self._archive.as_pandas()
+                    if len(df) == 0:
+                        return None
+                    # No CMP data yet — return highest fitness
+                    return str(df["objective"].idxmax())
+                except Exception:
+                    return None
+            return None
+
+        best_sample, best_id = -1.0, None
+        for entry in entries:
+            clade = self._clade.get(entry.solution_id, {"wins": 1, "losses": 1})
+            # Thompson sample: explores uncertain lineages, exploits proven ones
+            sample = float(np.random.beta(1 + clade["wins"], 1 + clade["losses"]))
+            if sample > best_sample:
+                best_sample, best_id = sample, entry.solution_id
+        return best_id
+
+    def update_clade_stats(self, agent_id: str, parent_id: str | None, success: bool) -> None:
+        """Propagate descendant score up lineage tree (HGM CMP mechanism).
+
+        When agent_id achieves result, ALL its ancestors' CMP estimates are updated.
+        This is the key insight: a parent that produces successful children has high CMP.
+        """
+        if not hasattr(self, "_clade"):
+            self._clade = {}
+        if not hasattr(self, "_lineage"):
+            self._lineage: dict[str, str] = {}
+
+        if parent_id:
+            self._lineage[agent_id] = parent_id
+
+        # Walk up the tree updating all ancestors
+        current = parent_id
+        visited: set = set()
+        while current and current not in visited:
+            visited.add(current)
+            if current not in self._clade:
+                self._clade[current] = {"wins": 1, "losses": 1}
+            if success:
+                self._clade[current]["wins"] += 1
+            else:
+                self._clade[current]["losses"] += 1
+            current = self._lineage.get(current)
+
     def coverage(self) -> float:
         return self.get_stats().coverage
