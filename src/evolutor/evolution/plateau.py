@@ -21,10 +21,22 @@ class PlateauDetector:
     def detect(self) -> bool:
         if len(self._history) < self.window_size:
             return False
-        window = self._history[-self.window_size:]
-        mean = sum(window) / len(window)
-        variance = sum((x - mean) ** 2 for x in window) / len(window)
-        return variance < self.variance_threshold
+        try:
+            import ruptures
+            import numpy as np
+            signal = list(self._history[-self.window_size:])
+            algo = ruptures.Pelt(model="rbf").fit(signal)
+            breakpoints = algo.predict(pen=3)
+            # No changepoint found = plateau
+            if len(breakpoints) <= 1:
+                return float(np.std(signal)) < 0.02
+            return False
+        except (ImportError, Exception):
+            # Fallback variance method
+            window = self._history[-self.window_size:]
+            mean = sum(window) / len(window)
+            variance = sum((x - mean) ** 2 for x in window) / len(window)
+            return variance < self.variance_threshold
 
     def suggest_action(self) -> str:
         if not self.detect():
