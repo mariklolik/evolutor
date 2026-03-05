@@ -3,94 +3,375 @@
   "description": "Transform Evolutor from scaffolding into a working SOTA self-evolving coding agent. HGM tree + CMP Thompson + DGM diagnosis + Live-SWE-agent reflection + MAP-Elites archive.",
   "userStories": [
     {
-      "id": "US-101",
-      "title": "Rewrite seed_agent.py — mini-swe-agent + Live-SWE-agent pattern",
+      "id": "US-201",
+      "title": "seed_agent.py — execute_bash + BASH_TOOL + constants + prompts + markers",
       "phase": 0,
-      "passes": false
+      "passes": true,
+      "target_file": "src/evolutor/swebench/seed_agent.py",
+      "skills": [
+        "/claude-api"
+      ],
+      "required_reading": [
+        "/home/mekashirskiy/competitors/mini-swe-agent/src/minisweagent/agents/default.py",
+        "ralph/REVISED_ARCHITECTURE.md"
+      ],
+      "description": "Complete rewrite of src/evolutor/swebench/seed_agent.py. Model on mini-swe-agent + Live-SWE-agent pattern from REVISED_ARCHITECTURE.md 'Revised Seed Agent' section (contains exact code to follow). Create file with: (1) imports: anthropic, subprocess, os, json. (2) SYSTEM_PROMPT string with '# ===== EVOLVABLE SECTION: System Prompt =====' marker — guide agent to use bash for exploring code, reproducing bugs, making targeted fixes, testing. Include tool creation guidance (agent can write Python scripts as custom tools). (3) REFLECTION_PROMPT with marker — Live-SWE-agent pattern: 'Are you making progress? Would creating a custom tool help?' (4) TOOL_TEMPLATES = '' with marker (empty, grows via evolution). (5) WORKFLOW_HINTS = '' with marker (empty). (6) INSTANCE_TEMPLATE with {repo_dir}, {problem_statement}, {workflow_hints} placeholders. (7) BASH_TOOL dict in Anthropic format: name='bash', input_schema with 'command' string property, required=['command']. (8) MAX_STEPS = 50 and STEP_TIMEOUT = 30 with marker. (9) execute_bash(command, cwd, timeout=STEP_TIMEOUT) — subprocess.run(['bash', '-lc', command], capture_output=True, text=True, cwd=cwd, timeout=timeout), capture stdout+stderr, truncate to 10000 chars (first 5000 + '... truncated ...' + last 5000), return 'Exit code: N\\noutput'. Handle TimeoutExpired and Exception. All 6 evolvable sections must have '# ===== EVOLVABLE SECTION: <name> =====' markers. This story does NOT include solve_task/solve — those are in US-202.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/swebench/seed_agent.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.swebench.seed_agent import execute_bash, BASH_TOOL, MAX_STEPS, STEP_TIMEOUT, SYSTEM_PROMPT, REFLECTION_PROMPT, TOOL_TEMPLATES, WORKFLOW_HINTS, INSTANCE_TEMPLATE; assert MAX_STEPS==50; assert STEP_TIMEOUT==30; print(\"PASS: exports\")'",
+        "python3 -c 'from evolutor.swebench.seed_agent import BASH_TOOL; assert BASH_TOOL[\"name\"]==\"bash\"; assert \"command\" in BASH_TOOL[\"input_schema\"][\"properties\"]; assert BASH_TOOL[\"input_schema\"][\"properties\"][\"command\"][\"type\"]==\"string\"; assert \"command\" in BASH_TOOL[\"input_schema\"][\"required\"]; print(\"PASS: BASH_TOOL schema\")'",
+        "python3 -c 'from evolutor.swebench.seed_agent import execute_bash; r=execute_bash(\"echo hello world\", \"/tmp\"); assert \"hello world\" in r; assert \"Exit code: 0\" in r; print(\"PASS: execute_bash\")'",
+        "python3 -c 'c=open(\"src/evolutor/swebench/seed_agent.py\").read(); n=c.count(\"EVOLVABLE SECTION\"); assert n>=5, f\"need >=5, found {n}\"; print(f\"PASS: {n} markers\")'",
+        "python3 -c 'c=open(\"src/evolutor/swebench/seed_agent.py\").read(); assert \"view_file\" not in c; assert \"edit_file\" not in c; assert \"search_code\" not in c; assert \"THOUGHT\" not in c; assert \"ACTION\" not in c; print(\"PASS: no legacy\")'"
+      ]
     },
     {
-      "id": "US-102",
-      "title": "Fix harness.py — single-container Docker eval with test_patch",
+      "id": "US-202",
+      "title": "seed_agent.py — solve_task + solve functions",
       "phase": 0,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/swebench/seed_agent.py",
+      "skills": [
+        "/claude-api"
+      ],
+      "required_reading": [
+        "ralph/REVISED_ARCHITECTURE.md",
+        "ralph/deep_research_findings.md"
+      ],
+      "description": "Add to seed_agent.py (created in US-201): (1) solve_task(problem_statement, repo_dir, model='claude-sonnet-4-6') function: creates anthropic.Anthropic() client (reads ANTHROPIC_BASE_URL + ANTHROPIC_API_KEY from env automatically). Builds system prompt from SYSTEM_PROMPT + TOOL_TEMPLATES if non-empty. Creates messages list with INSTANCE_TEMPLATE formatted with repo_dir/problem_statement/workflow_hints. Loops up to MAX_STEPS: call client.messages.create(model=model, max_tokens=4096, system=system, tools=[BASH_TOOL], messages=messages), append assistant content to messages, extract tool_uses from response.content where b.type=='tool_use', if none break. For each tool_use: execute_bash(tool_use.input.get('command'), cwd=repo_dir), build tool_result dict with type='tool_result', tool_use_id, content. Append tool_results as user message. Inject REFLECTION_PROMPT as user message every 5 steps (step > 0 and step % 5 == 0). After loop, return execute_bash('git diff', repo_dir, timeout=10). NO THOUGHT/ACTION parsing. NO step-reflect suffix. (2) solve(issue, repo_root, model='claude-sonnet-4-6', max_steps=None) backward-compat wrapper: calls solve_task(issue, repo_root, model), returns dict with keys: success (bool, True if patch non-empty and not just 'Exit code'), summary (str), steps (int, 0), files_changed (list, empty), patch (str from solve_task). Total file must be under 200 lines.",
+      "verification": [
+        "python3 -c 'from evolutor.swebench.seed_agent import solve_task, solve; import inspect; sig=inspect.signature(solve_task); p=list(sig.parameters.keys()); assert \"problem_statement\" in p; assert \"repo_dir\" in p; assert \"model\" in p; print(\"PASS: solve_task sig\")'",
+        "python3 -c 'from evolutor.swebench.seed_agent import solve; import inspect; sig=inspect.signature(solve); assert \"issue\" in sig.parameters; print(\"PASS: solve sig\")'",
+        "python3 -c 'from evolutor.swebench.seed_agent import REFLECTION_PROMPT; assert len(REFLECTION_PROMPT)>50; lp=REFLECTION_PROMPT.lower(); assert \"progress\" in lp or \"reflect\" in lp; print(\"PASS: reflection\")'",
+        "python3 -c 'c=open(\"src/evolutor/swebench/seed_agent.py\").read(); assert \"THOUGHT\" not in c; assert \"ACTION\" not in c; assert \"STEP_REFLECT\" not in c; print(\"PASS: no legacy\")'",
+        "python3 -c 'lines=len(open(\"src/evolutor/swebench/seed_agent.py\").readlines()); assert lines<200, f\"too many: {lines}\"; print(f\"PASS: {lines} lines\")'"
+      ]
     },
     {
-      "id": "US-103",
-      "title": "Build SWE-bench Docker images and create run_baseline.py",
+      "id": "US-203",
+      "title": "harness.py — single-container Docker eval with test_patch",
       "phase": 0,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/swebench/harness.py",
+      "skills": [
+        "/systematic-debugging",
+        "/investigate"
+      ],
+      "required_reading": [
+        "src/evolutor/swebench/harness.py",
+        "ralph/EXECUTION_PRD.md"
+      ],
+      "description": "Fix critical double-container bug in _eval_task_docker(). Current code at lines 211-238 runs agent in container 1, then tests in separate container 2 — agent's file edits are LOST. Fix to use SINGLE docker run command that: (1) activates testbed conda env (source activate testbed or conda activate testbed), (2) applies test_patch via 'git apply' (pipe test_patch content to git apply inside container) so FAIL_TO_PASS tests exist, (3) pip installs anthropic structlog pydantic + pip install -e /evolutor --no-deps, (4) runs the seed agent via Python (import and call solve_task with problem_statement and /testbed), (5) runs FAIL_TO_PASS tests with pytest in SAME container (sees agent's edits), (6) captures structured output. Also fix FAIL_TO_PASS handling: it is a JSON string in HuggingFace dataset fields — must json.loads() to parse into a Python list. Use solve_task() which returns git diff string, not solve() which returns dict.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/swebench/harness.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'import inspect; from evolutor.swebench.harness import _eval_task_docker; s=inspect.getsource(_eval_task_docker); assert \"test_patch\" in s; assert \"git apply\" in s; print(\"PASS: test_patch\")'",
+        "python3 -c 'c=open(\"src/evolutor/swebench/harness.py\").read(); assert \"json.loads\" in c; print(\"PASS: json.loads\")'"
+      ]
     },
     {
-      "id": "US-104",
-      "title": "EvolutionNode + EvolutionTree + CMP Thompson sampling + expansion rule",
+      "id": "US-204",
+      "title": "harness.py — eval_agent_code_docker function",
+      "phase": 0,
+      "passes": false,
+      "target_file": "src/evolutor/swebench/harness.py",
+      "skills": [
+        "/investigate"
+      ],
+      "required_reading": [
+        "src/evolutor/swebench/harness.py"
+      ],
+      "description": "Add eval_agent_code_docker(agent_code, task, project_root, model='claude-sonnet-4-6', timeout=600) function to harness.py. This is what the evolution loop uses to test mutated agent variants. It: (1) writes agent_code string to a temporary file on host, (2) builds a docker run command that mounts the temp file into the container (e.g., -v /tmp/test_agent.py:/tmp/test_agent.py), (3) inside the container: applies test_patch, installs deps, runs the custom agent code file (python3 /tmp/test_agent.py or imports it), (4) runs FAIL_TO_PASS tests in same container, (5) parses output and returns a result object/namedtuple with fields: passed (bool), steps (int, 0 if unknown), error (str or None), logs (str, truncated to 5000 chars). The function should reuse patterns from _eval_task_docker but accept arbitrary agent code instead of using the installed module.",
+      "verification": [
+        "python3 -c 'from evolutor.swebench.harness import eval_agent_code_docker; import inspect; sig=inspect.signature(eval_agent_code_docker); p=list(sig.parameters.keys()); assert \"agent_code\" in p; assert \"task\" in p; print(\"PASS: signature\")'",
+        "python3 -c 'import inspect; from evolutor.swebench.harness import eval_agent_code_docker; s=inspect.getsource(eval_agent_code_docker); assert \"docker\" in s.lower() or \"subprocess\" in s.lower(); print(\"PASS: uses docker\")'"
+      ]
+    },
+    {
+      "id": "US-205",
+      "title": "Task discovery + run_baseline.py script",
+      "phase": 0,
+      "passes": false,
+      "target_file": "scripts/run_baseline.py",
+      "skills": [
+        "/vllm"
+      ],
+      "required_reading": [
+        "ralph/implementation_phases.md"
+      ],
+      "description": "Create results/ directory if missing. Discover available SWE-bench Docker images by running 'docker images --format {{.Repository}}:{{.Tag}}' and filtering for 'sweb.eval.x86_64' pattern. Extract instance_ids from image names (the part after sweb.eval.x86_64.). Save image list to results/available_tasks.json. Create scripts/run_baseline.py: discovers Docker images dynamically at runtime (NOT hardcoded), for each image loads corresponding SWE-bench task data (instance_id, problem_statement, FAIL_TO_PASS, test_patch etc — from datasets library or a local cache), reads seed agent code from src/evolutor/swebench/seed_agent.py, runs via eval_agent_code_docker(), records per-task results (instance_id, passed, time_seconds, steps, error), saves to results/baseline.json, prints summary with pass rate. Handle errors gracefully — if Docker or LLM fails, log error and continue to next task. NOTE: vLLM should be running with --enable-prefix-caching for 2-3x speedup on repeated system prompts across agent evaluations.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"scripts/run_baseline.py\").read()); print(\"PASS: syntax\")'",
+        "test -d results && echo 'PASS: results dir' || echo 'FAIL'",
+        "python3 -c 'c=open(\"scripts/run_baseline.py\").read(); assert \"docker\" in c.lower(); assert \"baseline\" in c.lower(); print(\"PASS: dynamic docker\")'"
+      ]
+    },
+    {
+      "id": "US-206",
+      "title": "tree.py — EvolutionNode + EvolutionTree basics",
       "phase": 1,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/evolution/tree.py",
+      "skills": [],
+      "required_reading": [
+        "/home/mekashirskiy/competitors/HGM/tree.py",
+        "ralph/EXECUTION_PRD.md"
+      ],
+      "description": "Create NEW file src/evolutor/evolution/tree.py. (1) EvolutionNode dataclass with fields: id (str), code (str — full seed_agent.py content), parent_id (str|None), children (list[str] — child node IDs), utility_measures (list[int] — binary 0/1 per task eval), evaluated_tasks (list[str] — instance IDs evaluated), mutation_type (str), mutation_description (str), created_at (float). Properties: num_evals returns len(utility_measures), mean_utility returns sum/len if any evals else 0.5 (NOT inf, NOT 0). Methods: to_dict() returns all fields as dict (children and lists as-is), from_dict(cls, data) class method reconstructs from dict. (2) EvolutionTree class: __init__(seed_code, tasks, eval_budget) stores tasks list and eval_budget, creates root EvolutionNode with id='root', mutation_type='seed', code=seed_code. Methods: add_child(parent_id, child_code, mutation_type, mutation_description) generates uuid4().hex[:8] id, creates node with parent_id set, appends id to parent's children list, stores in self.nodes dict, returns new id. record_eval(node_id, task_id, passed) appends 1 or 0 to node.utility_measures and task_id to node.evaluated_tasks. select_unevaluated_task(node_id) returns first task dict from self.tasks where task['instance_id'] not in node.evaluated_tasks, or None. save_state(path) writes JSON with nodes (each to_dict) + tasks + eval_budget. load_state(cls, path) class method reconstructs tree. Properties: n_evals (sum of all nodes' num_evals), n_nodes (len of nodes dict). Use imports: dataclasses, uuid, time, json.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/evolution/tree.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.evolution.tree import EvolutionNode, EvolutionTree; n=EvolutionNode(id=\"t\",code=\"x\",parent_id=None,children=[],utility_measures=[],evaluated_tasks=[],mutation_type=\"seed\",mutation_description=\"init\",created_at=0.0); assert n.num_evals==0; assert n.mean_utility==0.5; print(\"PASS: node\")'",
+        "python3 -c 'from evolutor.evolution.tree import EvolutionTree; t=EvolutionTree(\"# seed\",[{\"instance_id\":\"t1\"},{\"instance_id\":\"t2\"}],100); t.record_eval(\"root\",\"t1\",True); assert t.n_evals==1; cid=t.add_child(\"root\",\"# child\",\"improve_system_prompt\",\"test\"); assert t.n_nodes==2; assert cid in t.nodes[\"root\"].children; print(\"PASS: tree basics\")'",
+        "python3 -c 'import tempfile,os; from evolutor.evolution.tree import EvolutionTree; t=EvolutionTree(\"x\",[{\"instance_id\":\"t1\"}],50); t.record_eval(\"root\",\"t1\",True); p=tempfile.mktemp(suffix=\".json\"); t.save_state(p); t2=EvolutionTree.load_state(p); assert t2.n_evals==t.n_evals; assert len(t2.nodes)==len(t.nodes); os.unlink(p); print(\"PASS: persistence\")'"
+      ]
     },
     {
-      "id": "US-105",
-      "title": "DGM diagnosis mutator with 5 targeted mutation types",
+      "id": "US-207",
+      "title": "tree.py — CMP Thompson sampling + expansion rule + get_best_agent",
       "phase": 1,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/evolution/tree.py",
+      "skills": [],
+      "required_reading": [
+        "/home/mekashirskiy/competitors/HGM/hgm.py",
+        "ralph/REVISED_ARCHITECTURE.md"
+      ],
+      "description": "Add to EvolutionTree (created in US-206): (1) get_descendant_evals(node_id, num_pseudo=10) — NOTE: num_pseudo=10 from HGM source code (NOT 100). Recursively collect descendant utility_measures. For each node: if node has fewer evals than num_pseudo AND has >=1 eval, use [mean_utility]*num_pseudo as the node's contribution (pseudo-counts from HGM CMP). If node has >= num_pseudo evals, use raw utility_measures. If node has 0 evals, contribute empty list. Then recurse into all children and extend. This is HGM's Clade-Metaproductivity (CMP) estimator. (2) thompson_sample(for_expansion=True) — compute tau=self.eval_budget/max(1, self.eval_budget - self.n_evals). For each node: if for_expansion, evals=get_descendant_evals(node_id); else evals=list(node.utility_measures). Compute successes=sum(evals), failures=len(evals)-successes. alpha=tau*(1+successes), beta_param=tau*(1+failures). Sample theta from numpy.random.beta(max(alpha,0.01), max(beta_param,0.01)). Return node_id with highest theta. (3) should_expand(alpha=0.6) — return self.n_evals**alpha >= len(self.nodes)-1 (exclude root from count). (4) get_best_agent() — return node with highest mean_utility among nodes with >=3 evaluations. If none qualify, return root node. Must import numpy.",
+      "verification": [
+        "python3 -c 'from evolutor.evolution.tree import EvolutionTree; import numpy as np; t=EvolutionTree(\"x\",[{\"instance_id\":f\"t{i}\"} for i in range(5)],100); t.record_eval(\"root\",\"t0\",True); t.record_eval(\"root\",\"t1\",False); e=t.get_descendant_evals(\"root\"); assert len(e)>0; print(f\"PASS: {len(e)} descendant evals\")'",
+        "python3 -c 'from evolutor.evolution.tree import EvolutionTree; import numpy as np; np.random.seed(42); t=EvolutionTree(\"x\",[{\"instance_id\":f\"t{i}\"} for i in range(5)],100); t.record_eval(\"root\",\"t0\",True); s=t.thompson_sample(); assert s in t.nodes; print(f\"PASS: thompson selected {s}\")'",
+        "python3 -c 'from evolutor.evolution.tree import EvolutionTree; t=EvolutionTree(\"x\",[{\"instance_id\":f\"t{i}\"} for i in range(5)],100); [t.record_eval(\"root\",f\"t{i}\",True) for i in range(5)]; assert t.should_expand(); t.add_child(\"root\",\"# c\",\"improve_system_prompt\",\"t\"); assert t.should_expand(); print(\"PASS: expansion rule\")'",
+        "python3 -c 'c=open(\"src/evolutor/evolution/tree.py\").read(); assert \"tau\" in c; assert \"eval_budget\" in c; assert \"numpy\" in c or \"np.random.beta\" in c; print(\"PASS: tau + numpy\")'"
+      ]
     },
     {
-      "id": "US-106",
-      "title": "SWE-bench cascade evaluator — syntax → smoke → medium → full",
+      "id": "US-208",
+      "title": "mutator.py — MutationType enum + DIAGNOSIS_PROMPT + code extraction",
       "phase": 1,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/evolution/mutator.py",
+      "skills": [
+        "/instructor",
+        "/dspy"
+      ],
+      "required_reading": [
+        "/home/mekashirskiy/competitors/dgm/DGM_outer.py",
+        "ralph/EXECUTION_PRD.md"
+      ],
+      "description": "Rewrite src/evolutor/evolution/mutator.py. PRESERVE the existing extract logic at lines 149-210 (===FILE:===...===END=== marker extraction) — it works and is battle-tested. Build the new Mutator class around it. (1) MutationType enum (from enum import Enum) with exactly 5 string values: 'improve_system_prompt', 'add_tool_template', 'improve_reflection', 'add_workflow_hint', 'optimize_parameters'. (2) DIAGNOSIS_PROMPT module-level string with {agent_code} (or {parent_code}) and {failed_task_logs} placeholders. The prompt instructs the LLM to: analyze why the agent failed on the given tasks, choose ONE of the 5 mutation types, output sections MUTATION_TYPE: (one of the 5), ANALYSIS: (root cause), PLAN: (specific change), CODE: (complete modified seed_agent.py — the ENTIRE file, not a diff). DGM-style: ask for structured diagnosis before code output. (3) Mutator class with extract_code_from_response(self, text, fallback_code='') method: first try ===FILE:...===\\ncontent\\n===END=== markers (extract content between markers), then try markdown ```python\\n...\\n``` blocks (extract between backticks), then try detecting raw Python (look for lines starting with import/def/class and take from there to end). If nothing found, return fallback_code. NEVER return empty string — use fallback_code as last resort. Remove ALL old mutation types: refactor, optimize, harden, simplify, extend, test_improve. Remove old generate_mutation and crossover methods.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/evolution/mutator.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.evolution.mutator import MutationType; t=set(m.value for m in MutationType); expected={\"improve_system_prompt\",\"add_tool_template\",\"improve_reflection\",\"add_workflow_hint\",\"optimize_parameters\"}; assert t==expected, f\"got {t}\"; print(\"PASS: 5 types\")'",
+        "python3 -c 'from evolutor.evolution.mutator import DIAGNOSIS_PROMPT; assert \"{agent_code}\" in DIAGNOSIS_PROMPT or \"{parent_code}\" in DIAGNOSIS_PROMPT; assert \"MUTATION_TYPE\" in DIAGNOSIS_PROMPT; assert \"CODE\" in DIAGNOSIS_PROMPT; print(\"PASS: prompt\")'",
+        "python3 -c 'from evolutor.evolution.mutator import Mutator; m=Mutator(); r=m.extract_code_from_response(\"===FILE: x===\\nimport os\\ndef solve_task(): pass\\n===END===\"); assert \"import os\" in r; print(\"PASS: marker extraction\")'",
+        "python3 -c 'from evolutor.evolution.mutator import Mutator; m=Mutator(); r=m.extract_code_from_response(\"```python\\nimport os\\ndef f(): pass\\n```\"); assert \"import os\" in r; print(\"PASS: markdown extraction\")'",
+        "python3 -c 'c=open(\"src/evolutor/evolution/mutator.py\").read(); assert \"= \\\"refactor\\\"\" not in c; assert \"= \\\"harden\\\"\" not in c; assert \"generate_mutation\" not in c; print(\"PASS: no legacy\")'"
+      ]
     },
     {
-      "id": "US-107",
-      "title": "Unit tests for EvolutionTree, Thompson sampling, mutator, cascade",
+      "id": "US-209",
+      "title": "mutator.py — diagnose_and_mutate with LLM call",
       "phase": 1,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/evolution/mutator.py",
+      "skills": [
+        "/claude-api",
+        "/instructor",
+        "/outlines"
+      ],
+      "required_reading": [
+        "/home/mekashirskiy/competitors/dgm/DGM_outer.py",
+        "src/evolutor/evolution/mutator.py"
+      ],
+      "description": "Add to Mutator class (created in US-208): (1) diagnose_and_mutate(self, parent_code, failed_task_logs) method: formats DIAGNOSIS_PROMPT with parent_code and truncated failed_task_logs (max 50000 chars). Calls LLM via anthropic.Anthropic().messages.create(model=os.environ.get('EVOLUTOR_MODEL', 'claude-sonnet-4-6'), max_tokens=8192, messages=[{role: user, content: formatted_prompt}]). Parses response text to extract mutation_type (find line starting with 'MUTATION_TYPE:' and strip), code (via extract_code_from_response with fallback_code=parent_code), and description (find line starting with 'ANALYSIS:' and strip). Validates extracted code with ast.parse() — if invalid, return (parent_code, 'optimize_parameters', 'syntax error in mutation, keeping parent'). Returns tuple (child_code, mutation_type_str, description_str). (2) select_mutation_type(self, failure_text) heuristic fallback: if 'exit' or 'step 0' in text.lower() -> 'improve_system_prompt', if 'loop' or 'repeat' -> 'improve_reflection', if 'timeout' or 'timed out' -> 'optimize_parameters', default -> 'improve_system_prompt'. Import anthropic and os at module level. Consider using instructor pattern for structured output extraction if response parsing is fragile.",
+      "verification": [
+        "python3 -c 'from evolutor.evolution.mutator import Mutator; import inspect; sig=inspect.signature(Mutator.diagnose_and_mutate); p=list(sig.parameters.keys()); assert \"parent_code\" in p; assert \"failed_task_logs\" in p; print(\"PASS: signature\")'",
+        "python3 -c 'from evolutor.evolution.mutator import Mutator; m=Mutator(); assert hasattr(m,\"diagnose_and_mutate\"); assert hasattr(m,\"select_mutation_type\"); print(\"PASS: methods\")'",
+        "python3 -c 'from evolutor.evolution.mutator import Mutator; m=Mutator(); t=m.select_mutation_type(\"agent exit at step 0\"); assert t==\"improve_system_prompt\"; t2=m.select_mutation_type(\"agent looped repeatedly\"); assert t2==\"improve_reflection\"; print(\"PASS: heuristic\")'"
+      ]
     },
     {
-      "id": "US-108",
-      "title": "MAP-Elites archive with complexity × tool_diversity dimensions",
+      "id": "US-210",
+      "title": "cascade.py — CascadeResult + CascadingEvaluator with SWE-bench stages",
+      "phase": 1,
+      "passes": false,
+      "target_file": "src/evolutor/evolution/cascade.py",
+      "skills": [
+        "/grpo-rl-training"
+      ],
+      "required_reading": [
+        "ralph/EXECUTION_PRD.md",
+        "/home/mekashirskiy/competitors/openevolve/openevolve/evaluator.py"
+      ],
+      "description": "Rewrite src/evolutor/evolution/cascade.py. Model on OpenEvolve's _cascade_evaluate pattern: 3 stages with increasing task counts and threshold checking. (1) CascadeResult dataclass with fields: passed (bool), stage_reached (str — one of 'stage0_syntax', 'stage1_smoke', 'stage2_medium', 'stage3_full'), pass_rate (float), tasks_passed (int), tasks_total (int), rejection_reason (str), agent_logs (str, truncated to 2000 chars max). (2) CascadingEvaluator class: __init__(self, tasks, project_root, model='claude-sonnet-4-6') stores tasks list, project_root, model. evaluate(self, agent_code, max_stage=3) runs stages 0 through max_stage, stops on first failure, returns CascadeResult. _stage0_syntax(self, agent_code) uses ast.parse() in try/except, returns True if valid Python. _stage1_smoke(self, agent_code) picks first task from self.tasks, calls eval_agent_code_docker(agent_code, task, self.project_root, self.model, timeout=120), returns CascadeResult based on whether agent produced any output (not crashed at step 0). _stage2_medium(self, agent_code) runs on first 3 tasks, accepts if >=1/3 pass. _stage3_full(self, agent_code) runs on all tasks. Import eval_agent_code_docker from evolutor.swebench.harness. Remove ALL old pytest-based stages — no references to tests/unit, tests/integration, tests/scenario. Consider composite reward scoring: GRPO-style reward = syntax_valid*0.1 + runs_without_crash*0.3 + pass_rate*0.6.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/evolution/cascade.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.evolution.cascade import CascadeResult, CascadingEvaluator; r=CascadeResult(passed=False,stage_reached=\"stage0_syntax\",pass_rate=0.0,tasks_passed=0,tasks_total=0,rejection_reason=\"bad\",agent_logs=\"\"); print(\"PASS: CascadeResult\")'",
+        "python3 -c 'from evolutor.evolution.cascade import CascadingEvaluator; e=CascadingEvaluator.__new__(CascadingEvaluator); assert not e._stage0_syntax(\"def foo( invalid\"); assert e._stage0_syntax(\"x=1\"); print(\"PASS: syntax check\")'",
+        "python3 -c 'c=open(\"src/evolutor/evolution/cascade.py\").read(); assert \"tests/unit\" not in c; assert \"tests/integration\" not in c; print(\"PASS: no legacy\")'"
+      ]
+    },
+    {
+      "id": "US-211",
+      "title": "Unit tests for tree, mutator, cascade",
+      "phase": 1,
+      "passes": false,
+      "target_file": "tests/unit/test_evolution.py",
+      "skills": [
+        "/code-review"
+      ],
+      "required_reading": [
+        "src/evolutor/evolution/tree.py",
+        "src/evolutor/evolution/mutator.py",
+        "src/evolutor/evolution/cascade.py"
+      ],
+      "description": "Create/rewrite tests/unit/test_evolution.py with at least 12 test functions using pytest. Tree tests: test_tree_creation (root exists, n_nodes==1, n_evals==0), test_add_child (child created, parent.children contains child id, n_nodes==2), test_record_eval (utility_measures updated, n_evals incremented), test_descendant_evals_recursive (create root->child->grandchild tree, add evals at each level, verify get_descendant_evals from root includes all), test_thompson_sample_returns_valid_node (sample 10 times, each result must be in tree.nodes), test_expansion_rule (5 evals + 0 non-root nodes: 5**0.6=2.63>=0 so should expand; add 3 children: 5**0.6=2.63<3 so should NOT expand), test_json_persistence_roundtrip (save and load, verify n_evals and n_nodes match), test_get_best_agent_min_evals (node with 2 evals should not be selected over node with 3+ evals). Mutator tests: test_mutation_types_exactly_five, test_extract_code_marker_format (test with ===FILE:...=== markers), test_extract_code_markdown_format (test with ```python blocks), test_diagnosis_prompt_has_placeholders. Cascade tests: test_stage0_rejects_syntax_errors, test_stage0_accepts_valid, test_cascade_result_fields. All tests must pass.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"tests/unit/test_evolution.py\").read()); print(\"PASS: syntax\")'",
+        "cd /home/mekashirskiy/evolutor && python3 -m pytest tests/unit/test_evolution.py -v --tb=short && echo 'PASS: all tests pass'",
+        "python3 -c 'import re; c=open(\"tests/unit/test_evolution.py\").read(); fns=re.findall(r\"def (test_\\w+)\",c); assert len(fns)>=12, f\"need >=12, got {len(fns)}\"; print(f\"PASS: {len(fns)} tests\")'"
+      ]
+    },
+    {
+      "id": "US-212",
+      "title": "archive.py — compute_behavior + MAP-Elites behavioral dimensions",
       "phase": 2,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/evolution/archive.py",
+      "skills": [
+        "/faiss",
+        "/sentence-transformers"
+      ],
+      "required_reading": [
+        "ralph/EXECUTION_PRD.md",
+        "/home/mekashirskiy/competitors/openevolve/openevolve/database.py"
+      ],
+      "description": "Update src/evolutor/evolution/archive.py. PRESERVE existing CMP Thompson sampling at lines 116-151 and clade lineage propagation at lines 153-178 — they work. Add around them: (1) compute_behavior(agent_code) module-level function: count lines of code -> normalize to [0,1] with formula min(1, max(0, (lines-50)/450)) so 50 lines=0.0, 500 lines=1.0. Count tool templates by counting occurrences of 'def ' between '# ===== EVOLVABLE SECTION: Tool Templates' and next '# =====' marker (or end of TOOL_TEMPLATES string) -> normalize with min(1, count/10). Return [complexity, tool_diversity] as list of 2 floats. (2) Update EvolutionArchive class to support: 10x10 grid (100 cells). add_with_behavior(node_id, fitness, agent_code) computes behavior via compute_behavior, maps to cell index (row=int(b[0]*9.99), col=int(b[1]*9.99), idx=row*10+col), stores (node_id, fitness) if cell empty or fitness > existing. get_underexplored_cells() returns list of cell indices (0-99) with no entries. sample_from_cell(cell_index) returns node_id from that cell, or None if empty. NOTE: For future scaling, consider replacing grid with FAISS nearest-neighbor on sentence-transformer embeddings of agent code for richer behavioral dimensions.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/evolution/archive.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.evolution.archive import compute_behavior; b=compute_behavior(\"import os\\ndef solve_task(): pass\"); assert len(b)==2; assert 0<=b[0]<=1; assert 0<=b[1]<=1; print(f\"PASS: behavior={b}\")'",
+        "python3 -c 'from evolutor.evolution.archive import EvolutionArchive; a=EvolutionArchive(); assert hasattr(a,\"add_with_behavior\"); assert hasattr(a,\"get_underexplored_cells\"); assert hasattr(a,\"sample_from_cell\"); print(\"PASS: methods\")'"
+      ]
     },
     {
-      "id": "US-109",
-      "title": "Immutable kernel SHA verification for eval harness files",
+      "id": "US-213",
+      "title": "invariants.py — SHA verification + KernelIntegrityChecker",
       "phase": 2,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/kernel/invariants.py",
+      "skills": [
+        "/constitutional-ai"
+      ],
+      "required_reading": [
+        "ralph/EXECUTION_PRD.md",
+        "ralph/deep_research_findings.md"
+      ],
+      "description": "Add to src/evolutor/kernel/invariants.py: (1) IMMUTABLE_FILES module-level list: ['src/evolutor/swebench/harness.py', 'src/evolutor/kernel/evaluator.py', 'src/evolutor/kernel/invariants.py', 'scripts/proxy_server.py']. (2) compute_file_hashes(project_root) function: for each path in IMMUTABLE_FILES, compute SHA256 hex digest of file content (read as bytes) at project_root/path. Skip files that don't exist. Return dict mapping path->hash_hex_string. Use hashlib.sha256. (3) verify_kernel_integrity(project_root, expected_hashes) function: compute current hashes, compare with expected. Return tuple (ok: bool, violations: list[str]) where violations contains paths that differ or are missing. (4) KernelTamperError(Exception) class. (5) KernelIntegrityChecker class: __init__(self, project_root) stores project_root (as Path) and calls compute_file_hashes to store baseline_hashes. check(self) calls verify_kernel_integrity with stored baseline, raises KernelTamperError if any violations. get_baseline_hashes(self) returns the stored dict. Import hashlib and pathlib.Path. This prevents DGM-style reward hacking where evolved agents modify the evaluation harness — see constitutional-ai skill for self-critique patterns.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/kernel/invariants.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.kernel.invariants import compute_file_hashes,verify_kernel_integrity,IMMUTABLE_FILES; from pathlib import Path; h=compute_file_hashes(Path(\"/home/mekashirskiy/evolutor\")); ok,v=verify_kernel_integrity(Path(\"/home/mekashirskiy/evolutor\"),h); assert ok, f\"failed: {v}\"; print(f\"PASS: {len(h)} files verified\")'",
+        "python3 -c 'from evolutor.kernel.invariants import verify_kernel_integrity; from pathlib import Path; ok,v=verify_kernel_integrity(Path(\"/home/mekashirskiy/evolutor\"),{\"src/evolutor/swebench/harness.py\":\"deadbeef\"}); assert not ok; assert len(v)>0; print(\"PASS: tamper detected\")'",
+        "python3 -c 'from pathlib import Path; from evolutor.kernel.invariants import KernelIntegrityChecker; c=KernelIntegrityChecker(Path(\"/home/mekashirskiy/evolutor\")); c.check(); print(\"PASS: checker\")'"
+      ]
     },
     {
-      "id": "US-110",
-      "title": "Plateau detection wiring + diversification strategy",
+      "id": "US-214",
+      "title": "plateau.py — DiversificationStrategy",
       "phase": 2,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/evolution/plateau.py",
+      "skills": [],
+      "required_reading": [
+        "ralph/EXECUTION_PRD.md",
+        "src/evolutor/evolution/plateau.py"
+      ],
+      "description": "Update src/evolutor/evolution/plateau.py. Keep existing PlateauDetector with ruptures PELT (the detect() and record() methods work — note: internal state uses self._history attribute, NOT self.values). Add: (1) record_batch(self, fitness_values) method that calls self.record(v) for each v in the list. (2) should_diversify(self, window=40) method: if len(self._history) < window return False, else check if detect() finds a plateau in the last window values. (3) DiversificationStrategy class: __init__(self, archive, tree) stores references to EvolutionArchive and EvolutionTree. select_diverse_parent(self) checks archive.get_underexplored_cells() for empty cells — if any, pick a random occupied neighbor cell via archive.sample_from_cell() and return that node_id. If all cells empty or no archive data, fall back to tree.thompson_sample(). get_wider_mutation_params(self) returns dict {'temperature': 1.5, 'force_type': 'improve_system_prompt'}. apply(self, tree, archive) calls select_diverse_parent() and returns the selected node_id.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/evolution/plateau.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.evolution.plateau import PlateauDetector; pd=PlateauDetector(window_size=10); [pd.record(0.5) for _ in range(20)]; assert pd.detect(); print(\"PASS: plateau detected\")'",
+        "python3 -c 'from evolutor.evolution.plateau import DiversificationStrategy; assert hasattr(DiversificationStrategy,\"select_diverse_parent\"); assert hasattr(DiversificationStrategy,\"apply\"); assert hasattr(DiversificationStrategy,\"get_wider_mutation_params\"); print(\"PASS: strategy\")'"
+      ]
     },
     {
-      "id": "US-111",
-      "title": "Main HGM evolution loop — budget-based with all components wired",
+      "id": "US-215",
+      "title": "loop.py — EvolutionConfig + EvolutionReport + remove legacy code",
       "phase": 2,
-      "passes": false
+      "passes": false,
+      "target_file": "src/evolutor/evolution/loop.py",
+      "skills": [],
+      "required_reading": [
+        "ralph/EXECUTION_PRD.md",
+        "src/evolutor/evolution/loop.py"
+      ],
+      "description": "Rewrite src/evolutor/evolution/loop.py. Remove ALL old generational loop code: any functions named _evaluate_agent, _evaluate_agent_local, _load_swebench_tasks, _run_agent_on_task, _format_failures, any 'for gen in range' loops, any 'datasets.load_dataset' calls. Then create: (1) EvolutionConfig dataclass (from dataclasses import dataclass) with defaults: eval_budget=100, expansion_alpha=0.6, max_steps_per_task=50, task_timeout=600, mutation_timeout=120, plateau_window=40, cascade_max_stage=1. (2) EvolutionReport as Pydantic BaseModel with int/float/str/list fields: evals_completed (int), tree_nodes (int), best_fitness (float), best_agent_id (str), archive_coverage (float), plateaus_detected (int), cascade_rejections (int), mutations_attempted (int), mutations_accepted (int), eval_log (list). Add imports for components that run_evolution will need (US-216): from evolutor.evolution.tree import EvolutionTree, from evolutor.evolution.archive import EvolutionArchive, from evolutor.evolution.mutator import Mutator, from evolutor.evolution.cascade import CascadingEvaluator, from evolutor.evolution.plateau import PlateauDetector, from evolutor.kernel.invariants import KernelIntegrityChecker, from evolutor.swebench.harness import eval_agent_code_docker. Use structlog for logger. This story creates the foundation — US-216 adds run_evolution.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/evolution/loop.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.evolution.loop import EvolutionConfig; c=EvolutionConfig(); assert c.eval_budget==100; assert c.expansion_alpha==0.6; assert c.plateau_window==40; print(\"PASS: config\")'",
+        "python3 -c 'from evolutor.evolution.loop import EvolutionReport; r=EvolutionReport(evals_completed=0,tree_nodes=1,best_fitness=0.0,best_agent_id=\"root\",archive_coverage=0.0,plateaus_detected=0,cascade_rejections=0,mutations_attempted=0,mutations_accepted=0,eval_log=[]); print(\"PASS: report\")'",
+        "python3 -c 'c=open(\"src/evolutor/evolution/loop.py\").read(); assert \"_evaluate_agent_local\" not in c; assert \"for gen in range\" not in c; assert \"datasets.load_dataset\" not in c; print(\"PASS: no legacy\")'"
+      ]
     },
     {
-      "id": "US-112",
-      "title": "Start infrastructure + run baseline benchmark",
-      "phase": 3,
-      "passes": false
+      "id": "US-216",
+      "title": "loop.py — run_evolution main HGM loop",
+      "phase": 2,
+      "passes": false,
+      "target_file": "src/evolutor/evolution/loop.py",
+      "skills": [
+        "/mlflow",
+        "/tensorboard",
+        "/ray-train"
+      ],
+      "required_reading": [
+        "/home/mekashirskiy/competitors/HGM/hgm.py",
+        "ralph/REVISED_ARCHITECTURE.md",
+        "ralph/implementation_phases.md"
+      ],
+      "description": "Add run_evolution(config: EvolutionConfig, seed_code: str, tasks: list, project_root: str) -> EvolutionReport function to loop.py (foundation from US-215). Main HGM loop: (1) Initialize: tree=EvolutionTree(seed_code, tasks, config.eval_budget), archive=EvolutionArchive(), mutator=Mutator(), cascade=CascadingEvaluator(tasks, project_root), plateau=PlateauDetector(), kernel=KernelIntegrityChecker(project_root). Init report counters to 0. (2) Main loop while tree.n_evals < config.eval_budget: (a) try kernel.check() — log warning if fails but continue. (b) if tree.should_expand(config.expansion_alpha): parent_id=tree.thompson_sample(for_expansion=True), get parent node, build failed_logs string from parent's failed tasks, call mutator.diagnose_and_mutate(parent.code, failed_logs), cascade.evaluate(child_code, max_stage=config.cascade_max_stage), if cascade passed: add_child to tree + archive.add_with_behavior, increment mutations_accepted, else increment cascade_rejections. Always increment mutations_attempted. (c) else (measure): node_id=tree.thompson_sample(for_expansion=False), task=tree.select_unevaluated_task(node_id), if None continue. Call eval_agent_code_docker(node.code, task, project_root), tree.record_eval(node_id, task_id, result.passed), update archive. (d) Every 20 evals: check plateau, if detected increment plateaus_detected. (e) Save tree.save_state('results/evolution_state.json'). Log progress. (3) Build EvolutionReport from final state. Also add helper get_failure_logs(node) that formats failed tasks as context string (truncated). NOTE: For future scaling, consider MLflow for experiment tracking, TensorBoard for real-time fitness curves, and Ray for distributed parallel evaluation across GPUs.",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"src/evolutor/evolution/loop.py\").read()); print(\"PASS: syntax\")'",
+        "python3 -c 'from evolutor.evolution.loop import run_evolution; print(\"PASS: importable\")'",
+        "python3 -c 'c=open(\"src/evolutor/evolution/loop.py\").read(); assert \"EvolutionTree\" in c; assert \"thompson_sample\" in c; assert \"should_expand\" in c; assert \"eval_agent_code_docker\" in c; print(\"PASS: HGM components\")'",
+        "python3 -c 'c=open(\"src/evolutor/evolution/loop.py\").read(); assert \"kernel\" in c.lower() and \"check\" in c; print(\"PASS: kernel check\")'"
+      ]
     },
     {
-      "id": "US-113",
-      "title": "Run evolution with eval budget",
+      "id": "US-217",
+      "title": "scripts/run_evolution.py + scripts/compare_results.py",
       "phase": 3,
-      "passes": false
+      "passes": false,
+      "target_file": "scripts/run_evolution.py",
+      "skills": [
+        "/mlflow"
+      ],
+      "required_reading": [
+        "scripts/run_baseline.py",
+        "src/evolutor/evolution/loop.py"
+      ],
+      "description": "Create two scripts: (1) scripts/run_evolution.py that: loads seed agent code from src/evolutor/swebench/seed_agent.py (read file), discovers available tasks from results/available_tasks.json or by running docker images command, creates EvolutionConfig (optionally override eval_budget via --budget CLI arg using argparse), calls run_evolution(config, seed_code, tasks, project_root), saves EvolutionReport.model_dump() to results/evolution_report.json, prints summary. Handle errors: wrap run_evolution in try/except, save partial state on failure. Consider adding MLflow tracking for experiment logging. (2) scripts/compare_results.py that: loads results/baseline.json and results/evolution_state.json (if they exist), uses EvolutionTree.load_state to find best agent, prints comparison table (baseline vs evolved pass rates), saves to results/comparison.json. Handle case where files don't exist yet (print 'no results yet').",
+      "verification": [
+        "python3 -c 'import ast; ast.parse(open(\"scripts/run_evolution.py\").read()); print(\"PASS: evolution script\")'",
+        "python3 -c 'import ast; ast.parse(open(\"scripts/compare_results.py\").read()); print(\"PASS: compare script\")'",
+        "python3 -c 'c=open(\"scripts/run_evolution.py\").read(); assert \"run_evolution\" in c; assert \"seed_agent\" in c or \"seed_code\" in c; print(\"PASS: wiring\")'"
+      ]
     },
     {
-      "id": "US-114",
-      "title": "Extract best agent + comparison benchmark",
+      "id": "US-218",
+      "title": "results/ANALYSIS.md template + final import verification",
       "phase": 3,
-      "passes": false
-    },
-    {
-      "id": "US-115",
-      "title": "Results documentation + evolution analysis",
-      "phase": 3,
-      "passes": false
+      "passes": false,
+      "target_file": "results/ANALYSIS.md",
+      "skills": [
+        "/ml-paper-writing"
+      ],
+      "required_reading": [
+        "ralph/EXECUTION_PRD.md"
+      ],
+      "description": "Create results/ANALYSIS.md with template sections following ML paper structure: '## Baseline Performance' (placeholder table for pass rate per task), '## Evolution Run Summary' (placeholder for evals completed, tree nodes, mutations), '## Best Evolved Agent' (placeholder for agent id, fitness, code diff), '## Improvement Comparison' (placeholder for baseline vs evolved delta table), '## Mutation Type Success Rates' (placeholder for per-type acceptance rates), '## Emergent Behaviors' (placeholder for discovered patterns like tool creation, error recovery), '## Ablation Notes' (placeholder for which components contributed most). Also run a final import verification: ensure all main modules import cleanly: evolutor.evolution.tree (EvolutionNode, EvolutionTree), evolutor.evolution.loop (EvolutionConfig, EvolutionReport, run_evolution), evolutor.evolution.mutator (Mutator, MutationType), evolutor.evolution.cascade (CascadingEvaluator, CascadeResult), evolutor.evolution.archive (compute_behavior, EvolutionArchive), evolutor.evolution.plateau (PlateauDetector, DiversificationStrategy), evolutor.kernel.invariants (KernelIntegrityChecker), evolutor.swebench.seed_agent (solve_task, execute_bash).",
+      "verification": [
+        "test -f results/ANALYSIS.md && echo 'PASS: exists' || echo 'FAIL'",
+        "python3 -c 'c=open(\"results/ANALYSIS.md\").read(); assert \"Baseline\" in c; assert \"Evolution\" in c; assert \"Mutation\" in c; print(\"PASS: sections\")'",
+        "python3 -c 'from evolutor.evolution.tree import EvolutionNode, EvolutionTree; from evolutor.evolution.loop import EvolutionConfig, EvolutionReport; from evolutor.evolution.mutator import Mutator, MutationType; from evolutor.evolution.cascade import CascadingEvaluator, CascadeResult; from evolutor.evolution.archive import compute_behavior, EvolutionArchive; from evolutor.evolution.plateau import PlateauDetector, DiversificationStrategy; from evolutor.kernel.invariants import KernelIntegrityChecker; from evolutor.swebench.seed_agent import solve_task, execute_bash; print(\"PASS: all imports OK\")'"
+      ]
     }
   ]
 }
