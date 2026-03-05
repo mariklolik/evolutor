@@ -30,21 +30,56 @@ def anthropic_to_openai(body: dict) -> dict:
     for msg in body.get("messages", []):
         role = msg.get("role", "user")
         content = msg.get("content", "")
+
         if isinstance(content, list):
-            # Anthropic content blocks
             text_parts = []
-            tool_results = []
+            tool_result_msgs = []  # becomes separate tool-role messages
+
             for block in content:
-                if isinstance(block, dict):
-                    btype = block.get("type", "")
-                    if btype == "text":
-                        text_parts.append(block.get("text", ""))
-                    elif btype == "tool_result":
-                        tool_results.append(block.get("content", ""))
-                    elif btype == "tool_use":
-                        text_parts.append(f"[Tool call: {block.get('name')}({json.dumps(block.get('input', {}))})]")
-            content = " ".join(text_parts + tool_results)
-        messages.append({"role": role, "content": content})
+                if not isinstance(block, dict):
+                    continue
+                btype = block.get("type", "")
+                if btype == "text":
+                    text_parts.append(block.get("text", ""))
+                elif btype == "tool_use":
+                    # assistant tool_use block → becomes tool_calls on assistant message
+                    # handled below when role == assistant
+                    pass
+                elif btype == "tool_result":
+                    tool_result_msgs.append({
+                        "role": "tool",
+                        "tool_call_id": block.get("tool_use_id", "call_0"),
+                        "content": _flatten_content(block.get("content", "")),
+                    })
+
+            if role == "assistant":
+                # Convert tool_use blocks to tool_calls
+                tool_uses = [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
+                texts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
+                oai_msg: dict = {"role": "assistant", "content": " ".join(texts) or None}
+                if tool_uses:
+                    oai_msg["tool_calls"] = [
+                        {
+                            "id": tu.get("id", f"call_{i}"),
+                            "type": "function",
+                            "function": {
+                                "name": tu["name"],
+                                "arguments": json.dumps(tu.get("input", {})),
+                            },
+                        }
+                        for i, tu in enumerate(tool_uses)
+                    ]
+                messages.append(oai_msg)
+            elif tool_result_msgs:
+                # user message with tool_results → text first, then tool role msgs
+                if text_parts:
+                    messages.append({"role": "user", "content": " ".join(text_parts)})
+                messages.extend(tool_result_msgs)
+            else:
+                content = " ".join(text_parts)
+                messages.append({"role": role, "content": content})
+        else:
+            messages.append({"role": role, "content": content})
 
     oai = {
         "model": MODEL_NAME,
@@ -55,26 +90,84 @@ def anthropic_to_openai(body: dict) -> dict:
     }
     if "stop_sequences" in body:
         oai["stop"] = body["stop_sequences"]
+    # Convert Anthropic tool definitions to OpenAI tools format
+    if "tools" in body:
+        oai["tools"] = [
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {"type": "object", "properties": {}}),
+                },
+            }
+            for t in body["tools"]
+        ]
+        oai["tool_choice"] = "auto"
     # Disable thinking for cleaner output
     oai["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
     return oai
+
+
+def _flatten_content(content) -> str:
+    """Flatten Anthropic content (string or list of blocks) to plain string."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                parts.append(block.get("text", block.get("content", "")))
+            else:
+                parts.append(str(block))
+        return " ".join(parts)
+    return str(content)
 
 
 def openai_to_anthropic(oai_resp: dict) -> dict:
     """Translate OpenAI response to Anthropic messages response format."""
     choice = oai_resp.get("choices", [{}])[0]
     msg = choice.get("message", {})
-    content = msg.get("content", "")
+    text = msg.get("content", "") or ""
     # Strip thinking tokens if present
-    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+    content_blocks = []
+    stop_reason = "end_turn"
+
+    # Convert tool_calls → Anthropic tool_use blocks
+    tool_calls = msg.get("tool_calls") or []
+    if tool_calls:
+        if text:
+            content_blocks.append({"type": "text", "text": text})
+        for tc in tool_calls:
+            fn = tc.get("function", {})
+            try:
+                args = json.loads(fn.get("arguments", "{}"))
+            except Exception:
+                args = {}
+            content_blocks.append({
+                "type": "tool_use",
+                "id": tc.get("id", "call_0"),
+                "name": fn.get("name", ""),
+                "input": args,
+            })
+        stop_reason = "tool_use"
+    else:
+        content_blocks.append({"type": "text", "text": text})
+
+    finish = choice.get("finish_reason", "stop")
+    if finish == "tool_calls":
+        stop_reason = "tool_use"
+
     usage = oai_resp.get("usage", {})
     return {
         "id": oai_resp.get("id", "msg_local"),
         "type": "message",
         "role": "assistant",
-        "content": [{"type": "text", "text": content}],
+        "content": content_blocks,
         "model": oai_resp.get("model", MODEL_NAME),
-        "stop_reason": "end_turn",
+        "stop_reason": stop_reason,
         "stop_sequence": None,
         "usage": {
             "input_tokens": usage.get("prompt_tokens", 0),
