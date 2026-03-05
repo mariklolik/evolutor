@@ -332,3 +332,152 @@ def _eval_task_local(
         except Exception as e:
             return TaskResult(instance_id=instance_id, passed=False, error=str(e),
                               problem_snippet=task["problem_statement"][:200])
+
+
+from dataclasses import dataclass as _dc
+
+
+@_dc
+class AgentEvalResult:
+    passed: bool
+    steps: int = 0
+    error: str | None = None
+    logs: str = ""
+
+
+def eval_agent_code_docker(
+    agent_code: str,
+    task: dict,
+    project_root: Path,
+    model: str = "claude-sonnet-4-6",
+    timeout: int = 600,
+) -> AgentEvalResult:
+    """Evaluate arbitrary agent code string on a SWE-bench task in Docker.
+
+    Used by the evolution loop to test mutated agent variants without installing them.
+    Writes agent_code to a temp file, mounts it into the container alongside the
+    test harness, and runs tests in a single container.
+    """
+    instance_id = task["instance_id"]
+    image = f"sweb.eval.x86_64.{instance_id}:latest"
+
+    check = subprocess.run(["docker", "image", "inspect", image],
+                           capture_output=True, timeout=5)
+    if check.returncode != 0:
+        return AgentEvalResult(passed=False, error=f"Docker image missing: {image}")
+
+    fail_to_pass = task["FAIL_TO_PASS"]
+    if isinstance(fail_to_pass, str):
+        fail_to_pass = json.loads(fail_to_pass)
+
+    anthropic_base_url = os.environ.get("ANTHROPIC_BASE_URL", "http://localhost:4000")
+    anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "sk-local")
+    test_patch = task.get("test_patch", "")
+    problem_statement = task["problem_statement"]
+    fail_to_pass_json = json.dumps(fail_to_pass)
+
+    # Write agent code to temp file (mounted read-only into container)
+    runner_script = f"""
+import sys, json, os, subprocess, types
+
+os.environ['ANTHROPIC_BASE_URL'] = {anthropic_base_url!r}
+os.environ['ANTHROPIC_API_KEY'] = {anthropic_api_key!r}
+os.environ['EVOLUTOR_MODEL'] = {model!r}
+no_proxy = 'localhost,127.0.0.1,0.0.0.0,::1'
+os.environ['no_proxy'] = no_proxy
+os.environ['NO_PROXY'] = no_proxy
+
+# Apply test_patch
+test_patch = {test_patch!r}
+if test_patch.strip():
+    r = subprocess.run('git apply -', shell=True, input=test_patch,
+                       capture_output=True, text=True, cwd='/testbed')
+    if r.returncode != 0:
+        print('WARNING: test_patch apply failed:', r.stderr[:300])
+
+# Install deps
+subprocess.run(['pip', 'install', 'anthropic', 'structlog', 'pydantic', '-q'],
+               capture_output=True)
+subprocess.run(['pip', 'install', '-e', '/evolutor', '-q', '--no-deps'],
+               capture_output=True)
+
+# Import custom agent code as module
+sys.path.insert(0, '/evolutor/src')
+import importlib.util
+spec = importlib.util.spec_from_file_location('custom_agent', '/tmp/custom_agent.py')
+agent_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(agent_module)
+
+# Run agent — expects solve_task(problem_statement, repo_dir, model) -> str (patch)
+patch = agent_module.solve_task(
+    problem_statement={problem_statement!r},
+    repo_dir='/testbed',
+    model={model!r},
+)
+print('PATCH_LINES:', patch.count('\\n'))
+
+# Run FAIL_TO_PASS tests
+tests = json.loads({fail_to_pass_json!r})
+r = subprocess.run(
+    ['python3', '-m', 'pytest'] + tests + ['-x', '-q', '--tb=short'],
+    capture_output=True, text=True, cwd='/testbed', timeout=120,
+)
+print('PYTEST_RC:', r.returncode)
+print(r.stdout[-2000:])
+print(r.stderr[-500:])
+"""
+
+    agent_file = None
+    runner_file = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False,
+                                         prefix="custom_agent_") as f:
+            f.write(agent_code)
+            agent_file = f.name
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False,
+                                          prefix="runner_") as f:
+            f.write(runner_script)
+            runner_file = f.name
+
+        result = subprocess.run(
+            [
+                "docker", "run", "--rm",
+                "-v", f"{project_root}:/evolutor:ro",
+                "-v", f"{agent_file}:/tmp/custom_agent.py:ro",
+                "-v", f"{runner_file}:/agent_runner.py:ro",
+                "--network", "host",
+                image,
+                "bash", "-c",
+                "source /opt/miniconda3/bin/activate testbed 2>/dev/null || true && "
+                "python3 /agent_runner.py",
+            ],
+            capture_output=True, text=True, timeout=timeout,
+        )
+
+        output = result.stdout + result.stderr
+        logs = output[-5000:] if len(output) > 5000 else output
+        passed = False
+        for line in output.splitlines():
+            if line.startswith("PYTEST_RC:"):
+                rc = line.split(":", 1)[1].strip()
+                passed = (rc == "0")
+                break
+
+        return AgentEvalResult(
+            passed=passed,
+            error=None if passed else output[-400:],
+            logs=logs,
+        )
+
+    except subprocess.TimeoutExpired:
+        return AgentEvalResult(passed=False, error="timeout", logs="")
+    except Exception as e:
+        return AgentEvalResult(passed=False, error=str(e), logs="")
+    finally:
+        for p in [agent_file, runner_file]:
+            if p:
+                try:
+                    os.unlink(p)
+                except Exception:
+                    pass

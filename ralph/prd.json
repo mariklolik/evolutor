@@ -72,7 +72,7 @@
       "id": "US-204",
       "title": "harness.py — eval_agent_code_docker function",
       "phase": 0,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/swebench/harness.py",
       "skills": [
         "/investigate"
