@@ -168,3 +168,22 @@ def solve_task(
     # Extract patch
     patch = execute_bash("git diff", cwd=repo_dir, timeout=10)
     return patch
+
+
+def solve(
+    issue: str,
+    repo_root: str,
+    model: str | None = None,
+    max_steps: int | None = None,
+) -> dict:
+    """Backward-compatible wrapper around solve_task."""
+    model = model or os.environ.get("EVOLUTOR_MODEL", "claude-sonnet-4-6")
+    patch = solve_task(issue, repo_root, model=model)
+    success = bool(patch and "Exit code" not in patch and patch.strip().startswith("diff"))
+    return {
+        "success": success,
+        "summary": "",
+        "steps": 0,
+        "files_changed": [],
+        "patch": patch,
+    }

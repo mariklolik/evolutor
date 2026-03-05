@@ -29,7 +29,7 @@
       "id": "US-202",
       "title": "seed_agent.py — solve_task + solve functions",
       "phase": 0,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/swebench/seed_agent.py",
       "skills": [
         "/claude-api"
