@@ -147,7 +147,7 @@
       "id": "US-208",
       "title": "mutator.py — MutationType enum + DIAGNOSIS_PROMPT + code extraction",
       "phase": 1,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/evolution/mutator.py",
       "skills": [
         "/instructor",

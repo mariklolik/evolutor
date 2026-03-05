@@ -1,210 +1,181 @@
-"""Mutation generation for code evolution."""
+"""Mutation generation for SWE-bench agent evolution.
 
+Uses DGM-style diagnosis: analyze failure logs, choose one of 5 targeted
+mutation types, output the complete modified seed_agent.py.
+"""
 from __future__ import annotations
 
-import random
+import os
+import re
 from enum import Enum
-from pathlib import Path
 
 import structlog
-from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
 
 
 class MutationType(str, Enum):
-    refactor = "refactor"
-    optimize = "optimize"
-    harden = "harden"
-    simplify = "simplify"
-    extend = "extend"
-    test_improve = "test_improve"
+    improve_system_prompt = "improve_system_prompt"
+    add_tool_template = "add_tool_template"
+    improve_reflection = "improve_reflection"
+    add_workflow_hint = "add_workflow_hint"
+    optimize_parameters = "optimize_parameters"
 
 
-class Mutation(BaseModel):
-    mutation_type: MutationType
-    description: str
-    target_files: list[str] = Field(default_factory=list)
-    prompt: str = ""
+DIAGNOSIS_PROMPT = """You are an expert at improving AI coding agents for SWE-bench.
+
+Here is the current coding agent (seed_agent.py):
+
+```python
+{agent_code}
+```
+
+The agent was evaluated on SWE-bench tasks and produced these failures:
+
+{failed_task_logs}
+
+Analyze the failures and output ONE targeted improvement. Choose the mutation type
+that best addresses the root cause.
+
+Available mutation types:
+- improve_system_prompt: Agent doesn't attempt to solve / exits early / misunderstands task
+- add_tool_template: Agent struggles with file editing / code search operations
+- improve_reflection: Agent loops without progress / repeats same failed actions
+- add_workflow_hint: Agent uses wrong approach for the task type
+- optimize_parameters: Agent times out / uses too many steps without solving
+
+Output your response with these EXACT sections:
+
+MUTATION_TYPE: <one of the 5 types above>
+
+ANALYSIS: <root cause of failures — be specific>
+
+PLAN: <exact change to make — which section, what to add/change>
+
+CODE:
+===FILE: src/evolutor/swebench/seed_agent.py===
+<complete modified seed_agent.py — the ENTIRE file, not a diff>
+===END===
+
+IMPORTANT:
+- Output the ENTIRE seed_agent.py file in the CODE section
+- Keep the EVOLVABLE SECTION markers intact
+- Make exactly one focused change
+- Do not use placeholders — output real, runnable Python code
+"""
 
 
 class Mutator:
-    """Generate mutations for code evolution."""
+    """Generate LLM-powered mutations of the seed agent."""
 
-    def generate_mutation(self, target_files: list[str], context: str = "") -> Mutation:
-        mutation_type = self.select_mutation_type(context)
-        prompts = {
-            MutationType.refactor: "Refactor this code for better readability and maintainability.",
-            MutationType.optimize: "Optimize this code for better performance.",
-            MutationType.harden: "Add error handling and input validation.",
-            MutationType.simplify: "Simplify this code by removing unnecessary complexity.",
-            MutationType.extend: "Extend this code with useful new functionality.",
-            MutationType.test_improve: "Add or improve tests for better coverage.",
-        }
-        return Mutation(
-            mutation_type=mutation_type,
-            description=f"{mutation_type.value} on {len(target_files)} file(s)",
-            target_files=target_files,
-            prompt=prompts[mutation_type],
-        )
+    def extract_code_from_response(self, text: str, fallback_code: str = "") -> str:
+        """Extract Python code from LLM response text.
 
-    def crossover(self, mutation_a: Mutation, mutation_b: Mutation) -> Mutation:
-        target_files = list(set(mutation_a.target_files + mutation_b.target_files))
-        return Mutation(
-            mutation_type=random.choice([mutation_a.mutation_type, mutation_b.mutation_type]),
-            description=f"crossover: {mutation_a.mutation_type.value} + {mutation_b.mutation_type.value}",
-            target_files=target_files,
-            prompt=f"{mutation_a.prompt}\n\nAdditionally: {mutation_b.prompt}",
-        )
+        Tries three formats in order:
+        1. ===FILE: path===\\ncontent\\n===END=== markers (preferred)
+        2. Markdown ```python ... ``` code blocks
+        3. Raw Python detection (lines starting with import/def/class)
 
-    def select_mutation_type(self, context: str = "") -> MutationType:
-        """Heuristic mutation type selection based on context."""
-        context_lower = context.lower()
-        if "slow" in context_lower or "performance" in context_lower:
-            return MutationType.optimize
-        if "error" in context_lower or "crash" in context_lower:
-            return MutationType.harden
-        if "complex" in context_lower or "long" in context_lower:
-            return MutationType.simplify
-        if "coverage" in context_lower or "test" in context_lower:
-            return MutationType.test_improve
-        if "feature" in context_lower or "add" in context_lower:
-            return MutationType.extend
-        return random.choice(list(MutationType))
-
-    async def apply_mutation(
-        self, target_files: list[str], project_root: "Path", context: str = ""
-    ) -> dict[str, str]:
-        """Call LLM to generate real code changes. Returns {filepath: new_content}.
-
-        Based on DGM self_improve_step.py pattern: give LLM full file content + failure context,
-        get back modified files as JSON.
+        Returns fallback_code if nothing found — never returns empty string.
         """
-        import os
-        import json
-        import re
-        import anthropic
-        from pathlib import Path
-
-        mutation = self.generate_mutation(target_files, context)
-        project_root = Path(project_root)
-
-        # Read target files (skip >40KB files)
-        file_contents: dict[str, str] = {}
-        for f in target_files[:3]:
-            p = project_root / f
-            if p.exists() and p.stat().st_size < 40_000:
-                file_contents[f] = p.read_text(errors="replace")
-
-        if not file_contents:
-            logger.warning("apply_mutation_no_readable_files", files=target_files)
-            return {}
-
-        # DGM-style prompt: include full code + mutation goal + rules
-        files_section = "\n\n".join(
-            f"### FILE: {k}\n```python\n{v}\n```" for k, v in file_contents.items()
-        )
-        prompt = (
-            f"## Mutation Goal\n{mutation.description}\n"
-            f"## Mutation Type\n{mutation.mutation_type.value}\n"
-            f"## Context\n{context}\n\n"
-            f"## Files to Modify\n{files_section}\n\n"
-            "## Task\n"
-            "Apply the mutation to the file shown above. Output the COMPLETE modified Python file.\n\n"
-            "Use this format (replace the path and file content accordingly):\n"
-            "===FILE: src/evolutor/swebench/seed_agent.py===\n"
-            "\"\"\"docstring\"\"\"\n"
-            "import os\n"
-            "# ... rest of file ...\n"
-            "===END===\n\n"
-            "Requirements:\n"
-            "- Output the ENTIRE file (not just changed lines)\n"
-            "- Keep all existing functionality unless the mutation goal requires changing it\n"
-            "- Make the change minimal and focused\n"
-            "- The output must be valid Python — no placeholders, no ellipsis in real code paths"
-        )
-
-        client = anthropic.Anthropic(
-            base_url=os.environ.get("ANTHROPIC_BASE_URL", "http://localhost:4000"),
-            api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-local"),
-        )
-
-        try:
-            resp = client.messages.create(
-                model=os.environ.get("EVOLUTOR_MODEL", "claude-sonnet-4-6"),
-                max_tokens=8192,
-                system=(
-                    "You are an expert Python developer implementing precise code mutations. "
-                    "Output modified files using ===FILE: path=== ... ===END=== markers. "
-                    "No JSON, no markdown, no explanation."
-                ),
-                messages=[{"role": "user", "content": prompt}],
-            )
-            text = resp.content[0].text.strip()
-            return self._extract_json_files(text, fallback_paths=target_files[:1])
-        except Exception as e:
-            logger.error("apply_mutation_llm_error", error=str(e))
-            return {}
-
-    def _extract_json_files(self, text: str, fallback_paths: list[str] | None = None) -> dict[str, str]:
-        """Extract {filepath: content} from LLM response.
-
-        Supports three formats:
-        1. Marker format: ===FILE: path===\\ncontent\\n===END===  (preferred)
-        2. JSON format: {"path": "content"}  (legacy fallback)
-        3. Raw code block: ```python\\ncode\\n``` (last resort, uses fallback_paths[0])
-        """
-        import json
-        import re
-
-        # Format 1: marker-based (no JSON escaping issues)
+        # Format 1: marker-based (battle-tested)
         marker_pattern = re.compile(
             r"===FILE:\s*(.+?)===\n(.*?)===END===", re.DOTALL
         )
         matches = marker_pattern.findall(text)
         if matches:
-            result = {}
-            for path, content in matches:
-                # Strip markdown fences if model wrapped content
-                content = content.strip()
-                if content.startswith("```python"):
-                    content = content[len("```python"):].lstrip("\n")
-                elif content.startswith("```"):
-                    content = content[3:].lstrip("\n")
-                if content.endswith("```"):
-                    content = content[:-3].rstrip("\n")
-                result[path.strip()] = content
-            return result
+            path, content = matches[0]  # Take first match
+            content = content.strip()
+            # Strip markdown fences if model wrapped content inside markers
+            if content.startswith("```python"):
+                content = content[len("```python"):].lstrip("\n")
+            elif content.startswith("```"):
+                content = content[3:].lstrip("\n")
+            if content.endswith("```"):
+                content = content[:-3].rstrip("\n")
+            if content.strip():
+                return content
 
-        # Format 2: JSON fallback — strip markdown fences first
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            parts = text.split("```")
-            if len(parts) >= 3:
-                text = parts[1].strip()
+        # Format 2: markdown code blocks
+        md_pattern = re.compile(r"```python\n(.*?)```", re.DOTALL)
+        md_matches = md_pattern.findall(text)
+        if md_matches:
+            content = md_matches[0].strip()
+            if content:
+                return content
+
+        # Also try ``` without language specifier
+        md_bare = re.compile(r"```\n(.*?)```", re.DOTALL)
+        bare_matches = md_bare.findall(text)
+        if bare_matches:
+            for candidate in bare_matches:
+                candidate = candidate.strip()
+                if any(kw in candidate for kw in ("def ", "import ", "class ")):
+                    return candidate
+
+        # Format 3: raw Python detection
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            if line.startswith(("import ", "from ", "def ", "class ", '"""')):
+                candidate = "\n".join(lines[i:]).strip()
+                if candidate:
+                    return candidate
+
+        # Last resort: return fallback
+        logger.warning("extract_code_fallback", text_len=len(text))
+        return fallback_code or text.strip()
+
+    def mutate(
+        self,
+        parent_code: str,
+        failed_task_logs: str,
+        mutation_type: MutationType | None = None,
+    ) -> tuple[str, str]:
+        """Call LLM to generate a mutated agent. Returns (child_code, mutation_description)."""
+        import anthropic
+
+        prompt = DIAGNOSIS_PROMPT.format(
+            agent_code=parent_code,
+            failed_task_logs=failed_task_logs[:30000],
+        )
+
+        client = anthropic.Anthropic()
+        model = os.environ.get("EVOLUTOR_MODEL", "claude-sonnet-4-6")
+
         try:
-            result = json.loads(text)
-            if isinstance(result, dict):
-                return {k: v for k, v in result.items() if isinstance(v, str)}
-        except json.JSONDecodeError:
-            pass
-        # Try to find JSON object in text
-        match = re.search(r'\{["\s]*"[^"]+"\s*:', text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(text[match.start():])
-            except Exception:
-                pass
-        # Format 3: raw code block fallback — use first target file as key
-        if fallback_paths:
-            clean = text.strip()
-            # Strip leading "python" if model started inside a code fence
-            if clean.startswith("python\n"):
-                clean = clean[7:]
-            # Try to detect Python code (has def/class/import)
-            if any(kw in clean for kw in ("def ", "class ", "import ", "from ")):
-                logger.info("apply_mutation_raw_code_fallback", path=fallback_paths[0])
-                return {fallback_paths[0]: clean}
-        logger.warning("apply_mutation_json_parse_failed", text_preview=text[:200])
-        return {}
+            response = client.messages.create(
+                model=model,
+                max_tokens=8192,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text
+
+            # Extract mutation type from response
+            mut_type = "unknown"
+            for line in text.splitlines():
+                if line.startswith("MUTATION_TYPE:"):
+                    mut_type = line.split(":", 1)[1].strip()
+                    break
+
+            # Extract analysis
+            analysis = ""
+            in_analysis = False
+            for line in text.splitlines():
+                if line.startswith("ANALYSIS:"):
+                    analysis = line.split(":", 1)[1].strip()
+                    in_analysis = True
+                elif line.startswith(("PLAN:", "CODE:", "MUTATION_TYPE:")):
+                    in_analysis = False
+                elif in_analysis:
+                    analysis += " " + line.strip()
+
+            # Extract code
+            child_code = self.extract_code_from_response(text, fallback_code=parent_code)
+            description = f"{mut_type}: {analysis[:200]}"
+
+            logger.info("mutation_generated", mut_type=mut_type, code_len=len(child_code))
+            return child_code, description
+
+        except Exception as e:
+            logger.error("mutation_llm_error", error=str(e))
+            return parent_code, f"mutation_failed: {str(e)}"
