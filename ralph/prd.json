@@ -256,7 +256,7 @@
       "id": "US-213",
       "title": "invariants.py — SHA verification + KernelIntegrityChecker",
       "phase": 2,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/kernel/invariants.py",
       "skills": [
         "/constitutional-ai"

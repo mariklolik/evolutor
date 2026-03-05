@@ -2,12 +2,69 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable
 
 import structlog
 from pydantic import BaseModel, Field
+
+# Files that must not be modified by the evolution loop (anti-reward-hacking)
+IMMUTABLE_FILES = [
+    "src/evolutor/swebench/harness.py",
+    "src/evolutor/kernel/evaluator.py",
+    "src/evolutor/kernel/invariants.py",
+    "scripts/proxy_server.py",
+]
+
+
+def compute_file_hashes(project_root: Path) -> dict[str, str]:
+    """Compute SHA256 hashes for all immutable files that exist."""
+    hashes = {}
+    for rel_path in IMMUTABLE_FILES:
+        p = project_root / rel_path
+        if p.exists():
+            hashes[rel_path] = hashlib.sha256(p.read_bytes()).hexdigest()
+    return hashes
+
+
+def verify_kernel_integrity(
+    project_root: Path,
+    expected_hashes: dict[str, str],
+) -> tuple[bool, list[str]]:
+    """Compare current file hashes against expected. Returns (ok, violations)."""
+    current = compute_file_hashes(project_root)
+    violations = []
+    for path, expected in expected_hashes.items():
+        actual = current.get(path)
+        if actual is None:
+            violations.append(f"missing: {path}")
+        elif actual != expected:
+            violations.append(f"tampered: {path}")
+    return (len(violations) == 0, violations)
+
+
+class KernelTamperError(Exception):
+    """Raised when immutable kernel files are modified."""
+
+
+class KernelIntegrityChecker:
+    """Snapshot and verify kernel file integrity during evolution."""
+
+    def __init__(self, project_root: Path | str) -> None:
+        self.project_root = Path(project_root)
+        self.baseline_hashes = compute_file_hashes(self.project_root)
+
+    def check(self) -> None:
+        """Verify current files match baseline. Raises KernelTamperError if not."""
+        ok, violations = verify_kernel_integrity(self.project_root, self.baseline_hashes)
+        if not ok:
+            raise KernelTamperError(f"Kernel tampered: {violations}")
+
+    def get_baseline_hashes(self) -> dict[str, str]:
+        return dict(self.baseline_hashes)
 
 logger = structlog.get_logger()
 
