@@ -109,7 +109,7 @@
       "id": "US-206",
       "title": "tree.py — EvolutionNode + EvolutionTree basics",
       "phase": 1,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/evolution/tree.py",
       "skills": [],
       "required_reading": [
