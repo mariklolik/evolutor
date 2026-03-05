@@ -14,3 +14,7 @@ dist/
 build/
 .ruff_cache/
 .mypy_cache/
+
+# SWE-bench build logs and run artifacts
+logs/
+results/

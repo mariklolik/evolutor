@@ -58,60 +58,114 @@ class TaskResult:
     error: str = ""
 
 
-def eval_task_local(task: dict, agent_fn, max_steps: int = 25) -> TaskResult:
-    """Clone repo at base commit, run agent, check FAIL_TO_PASS tests."""
+MINI_SWE_AGENT_PATH = "/home/mekashirskiy/competitors/mini-swe-agent"
+
+
+def eval_task_docker(task: dict, agent_name: str, agent_runner_script: str, max_steps: int = 25) -> TaskResult:
+    """Run agent in SWE-bench Docker image, check FAIL_TO_PASS tests in same container."""
     instance_id = task["instance_id"]
-    repo_url = f"https://github.com/{task['repo']}.git"
+    image = f"sweb.eval.x86_64.{instance_id}:latest"
+    t0 = time.time()
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        repo_root = Path(tmpdir) / "repo"
-        t0 = time.time()
+    # FAIL_TO_PASS is a JSON string in HuggingFace dataset
+    fail_tests_raw = task["FAIL_TO_PASS"]
+    if isinstance(fail_tests_raw, str):
+        import json as _json
+        fail_tests = _json.loads(fail_tests_raw)
+    else:
+        fail_tests = fail_tests_raw
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(agent_runner_script)
+        runner_path = f.name
+
+    # Write test_patch so FAIL_TO_PASS tests exist in the container
+    test_patch = task.get("test_patch", "")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as pf:
+        pf.write(test_patch)
+        patch_path = pf.name
+
+    try:
+        # Single docker run: apply test_patch → run agent → run FAIL_TO_PASS tests
+        fail_tests_str = " ".join(fail_tests)
+        docker_cmd = [
+            "docker", "run", "--rm",
+            "-v", f"{PROJECT_ROOT}:/evolutor:ro",
+            "-v", f"{runner_path}:/agent_runner.py:ro",
+            "-v", f"{patch_path}:/test.patch:ro",
+        ]
+        if agent_name == "mini-swe-agent":
+            docker_cmd += ["-v", f"{MINI_SWE_AGENT_PATH}:/mini-swe-agent:ro"]
+        docker_cmd += [
+            "-e", f"ANTHROPIC_BASE_URL={os.environ.get('ANTHROPIC_BASE_URL', 'http://127.0.0.1:4000')}",
+            "-e", f"ANTHROPIC_API_KEY={os.environ.get('ANTHROPIC_API_KEY', 'sk-local')}",
+            "-e", f"EVOLUTOR_MODEL={MODEL}",
+            "-e", "OPENAI_BASE_URL=http://127.0.0.1:8000/v1",
+            "-e", "OPENAI_API_KEY=sk-local",
+            "--network", "host",
+            image,
+            "bash", "-c",
+            "source /opt/miniconda3/bin/activate testbed 2>/dev/null || true; "
+            "git apply /test.patch 2>/dev/null || true; "  # add FAIL_TO_PASS tests
+            "pip install anthropic structlog pydantic -q 2>/dev/null; "
+            "pip install -e /evolutor -q --no-deps 2>/dev/null; "
+            "python3 /agent_runner.py; "
+            f"python3 -m pytest {fail_tests_str} -x -q --tb=short 2>&1 | tail -20; "
+            f"python3 -m pytest {fail_tests_str} -q --tb=no 2>&1 | grep -E '(passed|failed|error)' | tail -3",
+        ]
+        result = subprocess.run(
+            docker_cmd,
+            capture_output=True, text=True, timeout=360,
+        )
+        os.unlink(runner_path)
+        os.unlink(patch_path)
+
+        output = result.stdout + result.stderr
+        # Check if tests passed
+        import re as _re
+        passed_match = _re.search(r"(\d+) passed", output)
+        failed_match = _re.search(r"(\d+) failed", output)
+        n_passed = int(passed_match.group(1)) if passed_match else 0
+        n_failed = int(failed_match.group(1)) if failed_match else 0
+
+        # Also check for AGENT_RESULT
+        agent_steps = 0
+        agent_files: list = []
+        for line in output.splitlines():
+            if line.startswith("AGENT_RESULT:"):
+                try:
+                    ar = json.loads(line[len("AGENT_RESULT:"):])
+                    agent_steps = ar.get("steps", 0)
+                    agent_files = ar.get("files_changed", [])
+                except Exception:
+                    pass
+
+        passed = n_failed == 0 and n_passed > 0
+        error = "" if passed else output[-400:]
+        return TaskResult(
+            instance_id=instance_id,
+            passed=passed,
+            elapsed=time.time() - t0,
+            steps=agent_steps,
+            files_changed=agent_files,
+            error=error,
+        )
+    except subprocess.TimeoutExpired:
         try:
-            subprocess.run(
-                ["git", "clone", "--depth=200", repo_url, str(repo_root)],
-                capture_output=True, check=True, timeout=90,
-            )
-            subprocess.run(
-                ["git", "checkout", task["base_commit"]],
-                capture_output=True, check=True, cwd=repo_root, timeout=30,
-            )
-            # Apply test patch (adds the FAIL_TO_PASS test cases)
-            subprocess.run(
-                ["git", "apply", "-"],
-                input=task["test_patch"], text=True,
-                capture_output=True, cwd=repo_root, timeout=10,
-            )
-            subprocess.run(
-                ["pip", "install", "-e", ".", "-q"],
-                capture_output=True, cwd=repo_root, timeout=120,
-            )
-
-            # Run agent
-            result = agent_fn(
-                issue=task["problem_statement"],
-                repo_root=repo_root,
-                model=MODEL,
-                max_steps=max_steps,
-            )
-
-            # Evaluate
-            fail_tests = task["FAIL_TO_PASS"]
-            test_out = subprocess.run(
-                ["python3", "-m", "pytest"] + fail_tests + ["-x", "-q", "--tb=short"],
-                capture_output=True, text=True, cwd=repo_root, timeout=60,
-            )
-            passed = test_out.returncode == 0
-            return TaskResult(
-                instance_id=instance_id,
-                passed=passed,
-                elapsed=time.time() - t0,
-                steps=result.get("steps", 0),
-                files_changed=result.get("files_changed", []),
-                error="" if passed else test_out.stdout[-300:],
-            )
-        except Exception as e:
-            return TaskResult(instance_id=instance_id, passed=False,
-                              elapsed=time.time() - t0, error=str(e)[:200])
+            os.unlink(runner_path)
+            os.unlink(patch_path)
+        except Exception:
+            pass
+        return TaskResult(instance_id=instance_id, passed=False,
+                          elapsed=time.time() - t0, error="timeout")
+    except Exception as e:
+        try:
+            os.unlink(runner_path)
+            os.unlink(patch_path)
+        except Exception:
+            pass
+        return TaskResult(instance_id=instance_id, passed=False,
+                          elapsed=time.time() - t0, error=str(e)[:200])
 
 
 # ── mini-swe-agent adapter ───────────────────────────────────────────────────
@@ -199,27 +253,69 @@ async def run_evolution():
     return report
 
 
+SEED_AGENT_RUNNER = '''
+import sys, json, os
+sys.path.insert(0, '/evolutor/src')
+os.environ.setdefault('no_proxy', 'localhost,127.0.0.1,0.0.0.0,::1')
+os.environ.setdefault('NO_PROXY', 'localhost,127.0.0.1,0.0.0.0,::1')
+from pathlib import Path
+from evolutor.swebench.seed_agent import solve
+result = solve(
+    issue={issue!r},
+    repo_root=Path('/testbed'),
+    model={model!r},
+    max_steps=30,
+)
+print('AGENT_RESULT:' + json.dumps(result))
+'''
+
+MINI_SWE_RUNNER = '''
+import sys, json, os, subprocess
+sys.path.insert(0, '/mini-swe-agent/src')
+os.environ['no_proxy'] = 'localhost,127.0.0.1,0.0.0.0,::1'
+os.environ['NO_PROXY'] = 'localhost,127.0.0.1,0.0.0.0,::1'
+os.environ['OPENAI_BASE_URL'] = 'http://127.0.0.1:8000/v1'
+os.environ['OPENAI_API_KEY'] = 'sk-local'
+try:
+    import litellm
+    litellm.suppress_debug_info = True
+    from minisweagent.agents.default import DefaultAgent
+    from minisweagent.environments.local import LocalEnvironment
+    from minisweagent.models.litellm_model import LitellmModel
+    env = LocalEnvironment(cwd='/testbed')
+    model = LitellmModel(model_name='openai/qwen3-coder-30b')
+    agent = DefaultAgent(model=model, env=env, max_steps=30)
+    agent.run({issue!r})
+except Exception as e:
+    print(f'mini-swe-agent error: {{e}}', file=sys.stderr)
+diff = subprocess.run(['git', 'diff', '--name-only'], capture_output=True, text=True, cwd='/testbed')
+files = diff.stdout.strip().splitlines()
+print('AGENT_RESULT:' + json.dumps({{"success": len(files) > 0, "steps": 30, "files_changed": files}}))
+'''
+
+
 def run_benchmarks(tasks: list[dict], evolved_agent_path: Path | None = None):
     print("\n" + "="*60)
-    print("PHASE 2: Benchmark on 5 SWE-bench tasks")
+    print("PHASE 2: Benchmark on 5 SWE-bench tasks (Docker eval)")
     print("="*60)
 
+    # agent_name → runner_script_template
     agents = {
-        "evolutor-seed (pre-evolution)": load_evolutor_agent(
-            PROJECT_ROOT / "src/evolutor/swebench/seed_agent.py"
-        ),
-        "mini-swe-agent": make_mini_swe_agent_fn(),
+        "evolutor-seed": SEED_AGENT_RUNNER,
+        "mini-swe-agent": MINI_SWE_RUNNER,
     }
     if evolved_agent_path and evolved_agent_path.exists():
-        agents["evolutor-evolved"] = load_evolutor_agent(evolved_agent_path)
+        agents["evolutor-evolved"] = SEED_AGENT_RUNNER  # same runner, evolved code mounted
 
     results = {}
-    for name, agent_fn in agents.items():
+    for name, runner_template in agents.items():
         print(f"\n--- {name} ---")
         agent_results = []
         for task in tasks:
             print(f"  [{task['instance_id']}] running...", flush=True)
-            r = eval_task_local(task, agent_fn, max_steps=25)
+            issue = task["problem_statement"]
+            runner = runner_template.format(issue=issue, model=MODEL)
+            r = eval_task_docker(task, name, runner, max_steps=30)
             status = "PASS ✓" if r.passed else "FAIL ✗"
             print(f"  [{task['instance_id']}] {status}  {r.elapsed:.0f}s  steps={r.steps}")
             agent_results.append(r)

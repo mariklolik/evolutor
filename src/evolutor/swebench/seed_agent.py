@@ -4,7 +4,7 @@ This is the minimal agent that the evolution loop improves over generations.
 Design principles (from paper analysis):
 - Radical simplicity: ~150 lines, easy for LLM to understand and modify
 - 4 tools (not bash-only): bash, view_file, edit_file, search_code
-- THOUGHT\\nACTION format (better than XML/JSON for reasoning)
+- THOUGHT\nACTION format (better than XML/JSON for reasoning)
 - Step-reflection after each action (Live-SWE-agent §3.2)
 - Cross-LLM: planner uses smaller model than executor (SAGE insight)
 """

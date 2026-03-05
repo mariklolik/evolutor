@@ -10,6 +10,9 @@ import argparse, json, os, re
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib import request as urlrequest
 
+# Bypass system HTTP_PROXY for localhost backend calls
+_no_proxy_opener = urlrequest.build_opener(urlrequest.ProxyHandler({}))
+
 BACKEND = os.environ.get("VLLM_BACKEND", "http://localhost:8000/v1")
 MODEL_NAME = os.environ.get("VLLM_MODEL_NAME", "qwen3-coder-30b")
 
@@ -56,7 +59,7 @@ def anthropic_to_openai(body: dict) -> dict:
                 # Convert tool_use blocks to tool_calls
                 tool_uses = [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
                 texts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
-                oai_msg: dict = {"role": "assistant", "content": " ".join(texts) or None}
+                oai_msg: dict = {"role": "assistant", "content": " ".join(texts) or ""}
                 if tool_uses:
                     oai_msg["tool_calls"] = [
                         {
@@ -209,7 +212,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urlrequest.urlopen(req, timeout=180) as resp:
+            with _no_proxy_opener.open(req, timeout=180) as resp:
                 oai_resp = json.loads(resp.read())
 
             if self.path.startswith("/v1/messages"):

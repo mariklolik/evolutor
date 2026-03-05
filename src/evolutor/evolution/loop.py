@@ -272,57 +272,87 @@ def _run_agent_on_task(project_root: Path, task: dict, model: str) -> dict:
 
     instance_id = task["instance_id"]
     try:
-        # Write a runner script that imports and runs seed_agent inside the container
-        runner = f"""
-import sys, json, os
-sys.path.insert(0, '/evolutor/src')
-from pathlib import Path
-from evolutor.swebench.seed_agent import solve
+        # FAIL_TO_PASS may be JSON string in HuggingFace dataset
+        fail_tests_raw = task.get("FAIL_TO_PASS", "[]")
+        if isinstance(fail_tests_raw, str):
+            fail_tests = json.loads(fail_tests_raw)
+        else:
+            fail_tests = fail_tests_raw
+        fail_tests_str = " ".join(fail_tests)
 
-result = solve(
-    issue={json.dumps(task['problem_statement'])!r},
-    repo_root=Path('/testbed'),
-    model={json.dumps(model)!r},
-    max_steps=30,
-)
-print(json.dumps(result))
-"""
+        issue_str = task['problem_statement']
+        # Write a runner script that installs deps, runs agent, runs tests
+        runner = (
+            "import sys, json, os, subprocess\n"
+            "os.environ['no_proxy'] = 'localhost,127.0.0.1,0.0.0.0,::1'\n"
+            "os.environ['NO_PROXY'] = 'localhost,127.0.0.1,0.0.0.0,::1'\n"
+            "sys.path.insert(0, '/evolutor/src')\n"
+            "from pathlib import Path\n"
+            "from evolutor.swebench.seed_agent import solve\n"
+            "\n"
+            f"result = solve(\n"
+            f"    issue={issue_str!r},\n"
+            f"    repo_root=Path('/testbed'),\n"
+            f"    model={model!r},\n"
+            "    max_steps=30,\n"
+            ")\n"
+            "print('AGENT_RESULT:' + json.dumps(result))\n"
+            "\n"
+            f"test_out = subprocess.run(\n"
+            f"    ['python3', '-m', 'pytest'] + {fail_tests!r} + ['-x', '-q', '--tb=no'],\n"
+            "    capture_output=True, text=True, cwd='/testbed', timeout=60\n"
+            ")\n"
+            "print('TESTS_PASSED:' + str(test_out.returncode == 0))\n"
+            "print(test_out.stdout[-200:])\n"
+        )
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(runner)
             runner_path = f.name
 
-        # Run inside the instance Docker container
-        container_name = f"sweb.eval.{instance_id}"
+        # Write test_patch to a temp file so we can mount+apply it in Docker
+        test_patch = task.get("test_patch", "")
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".patch", delete=False) as pf:
+            pf.write(test_patch)
+            patch_path = pf.name
+
+        # Run inside the instance Docker container — single run for agent + tests
         result = subprocess.run(
             [
                 "docker", "run", "--rm",
-                "--name", container_name,
                 "-v", f"{project_root}:/evolutor:ro",
                 "-v", f"{runner_path}:/runner.py:ro",
+                "-v", f"{patch_path}:/test.patch:ro",
                 "-e", f"ANTHROPIC_BASE_URL={os.environ.get('ANTHROPIC_BASE_URL', 'http://localhost:4000')}",
                 "-e", f"ANTHROPIC_API_KEY={os.environ.get('ANTHROPIC_API_KEY', 'sk-local')}",
                 "-e", f"EVOLUTOR_MODEL={model}",
                 "--network", "host",
                 f"sweb.eval.x86_64.{instance_id}:latest",
-                "python3", "/runner.py",
+                "bash", "-c",
+                "source /opt/miniconda3/bin/activate testbed 2>/dev/null || true; "
+                "git apply /test.patch 2>/dev/null || true; "  # add FAIL_TO_PASS tests
+                "pip install anthropic structlog pydantic -q 2>/dev/null; "
+                "pip install -e /evolutor -q --no-deps 2>/dev/null; "
+                "python3 /runner.py",
             ],
-            capture_output=True, text=True, timeout=300,
+            capture_output=True, text=True, timeout=360,
         )
         os.unlink(runner_path)
+        os.unlink(patch_path)
 
-        if result.returncode != 0:
-            return {"instance_id": instance_id, "passed": False,
-                    "error": result.stderr[:500]}
+        output = result.stdout + result.stderr
+        # Parse results
+        agent_result: dict = {}
+        for line in output.splitlines():
+            if line.startswith("AGENT_RESULT:"):
+                try:
+                    agent_result = json.loads(line[len("AGENT_RESULT:"):])
+                except Exception:
+                    pass
 
-        agent_result = json.loads(result.stdout.strip().split("\n")[-1])
-
-        # Now run FAIL_TO_PASS tests in the container (with agent's edits)
-        # This requires building a container with the patch applied — done via swebench harness
-        # For now: passed = agent reported success and produced file changes
-        passed = (agent_result.get("success") and
-                  len(agent_result.get("files_changed", [])) > 0)
+        passed = "TESTS_PASSED:True" in output
         return {"instance_id": instance_id, "passed": passed,
-                "agent_result": agent_result}
+                "agent_result": agent_result,
+                "error": "" if passed else output[-300:]}
 
     except Exception as e:
         return {"instance_id": instance_id, "passed": False, "error": str(e)}
