@@ -110,13 +110,15 @@ class Mutator:
             f"## Context\n{context}\n\n"
             f"## Files to Modify\n{files_section}\n\n"
             "## Instructions\n"
-            "Implement the mutation. Return ONLY a JSON object mapping filepath to complete new file content.\n"
-            'Example: {"src/foo.py": "# complete file content here\\n..."}\n'
+            "Implement the mutation. For EACH modified file, output it using this EXACT format:\n"
+            "===FILE: src/path/to/file.py===\n"
+            "<complete new file content here>\n"
+            "===END===\n\n"
             "Rules:\n"
             "1. Keep all existing imports and function signatures unless specifically changing them\n"
             "2. Do not break existing test contracts\n"
             "3. Make the smallest focused change that achieves the mutation goal\n"
-            "4. Return valid JSON only — no markdown fences, no explanation"
+            "4. Output ONLY the file blocks — no explanation, no markdown fences"
         )
 
         client = anthropic.Anthropic(
@@ -130,41 +132,76 @@ class Mutator:
                 max_tokens=8192,
                 system=(
                     "You are an expert Python developer implementing precise code mutations. "
-                    "Always return valid JSON only: {\"filepath\": \"complete file content\"}. "
-                    "No markdown, no explanation."
+                    "Output modified files using ===FILE: path=== ... ===END=== markers. "
+                    "No JSON, no markdown, no explanation."
                 ),
                 messages=[{"role": "user", "content": prompt}],
             )
             text = resp.content[0].text.strip()
-            return self._extract_json_files(text)
+            return self._extract_json_files(text, fallback_paths=target_files[:1])
         except Exception as e:
             logger.error("apply_mutation_llm_error", error=str(e))
             return {}
 
-    def _extract_json_files(self, text: str) -> dict[str, str]:
-        """Robustly extract {filepath: content} JSON from LLM response."""
+    def _extract_json_files(self, text: str, fallback_paths: list[str] | None = None) -> dict[str, str]:
+        """Extract {filepath: content} from LLM response.
+
+        Supports three formats:
+        1. Marker format: ===FILE: path===\\ncontent\\n===END===  (preferred)
+        2. JSON format: {"path": "content"}  (legacy fallback)
+        3. Raw code block: ```python\\ncode\\n``` (last resort, uses fallback_paths[0])
+        """
         import json
         import re
-        # Strip markdown fences
+
+        # Format 1: marker-based (no JSON escaping issues)
+        marker_pattern = re.compile(
+            r"===FILE:\s*(.+?)===\n(.*?)===END===", re.DOTALL
+        )
+        matches = marker_pattern.findall(text)
+        if matches:
+            result = {}
+            for path, content in matches:
+                # Strip markdown fences if model wrapped content
+                content = content.strip()
+                if content.startswith("```python"):
+                    content = content[len("```python"):].lstrip("\n")
+                elif content.startswith("```"):
+                    content = content[3:].lstrip("\n")
+                if content.endswith("```"):
+                    content = content[:-3].rstrip("\n")
+                result[path.strip()] = content
+            return result
+
+        # Format 2: JSON fallback — strip markdown fences first
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             parts = text.split("```")
             if len(parts) >= 3:
                 text = parts[1].strip()
-        # Try direct parse
         try:
             result = json.loads(text)
             if isinstance(result, dict):
                 return {k: v for k, v in result.items() if isinstance(v, str)}
         except json.JSONDecodeError:
             pass
-        # Try to find JSON object
+        # Try to find JSON object in text
         match = re.search(r'\{["\s]*"[^"]+"\s*:', text, re.DOTALL)
         if match:
             try:
                 return json.loads(text[match.start():])
             except Exception:
                 pass
+        # Format 3: raw code block fallback — use first target file as key
+        if fallback_paths:
+            clean = text.strip()
+            # Strip leading "python" if model started inside a code fence
+            if clean.startswith("python\n"):
+                clean = clean[7:]
+            # Try to detect Python code (has def/class/import)
+            if any(kw in clean for kw in ("def ", "class ", "import ", "from ")):
+                logger.info("apply_mutation_raw_code_fallback", path=fallback_paths[0])
+                return {fallback_paths[0]: clean}
         logger.warning("apply_mutation_json_parse_failed", text_preview=text[:200])
         return {}
