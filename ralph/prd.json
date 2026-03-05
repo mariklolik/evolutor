@@ -51,7 +51,7 @@
       "id": "US-203",
       "title": "harness.py — single-container Docker eval with test_patch",
       "phase": 0,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/swebench/harness.py",
       "skills": [
         "/systematic-debugging",

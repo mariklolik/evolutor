@@ -145,7 +145,7 @@ def _eval_task_docker(
     project_root: Path,
     model: str,
 ) -> TaskResult:
-    """Evaluate one task using SWE-bench Docker instance image."""
+    """Evaluate one task using SWE-bench Docker instance image — single container."""
     instance_id = task["instance_id"]
     image = f"sweb.eval.x86_64.{instance_id}:latest"
 
@@ -158,23 +158,63 @@ def _eval_task_docker(
         logger.debug("docker_image_missing", image=image, fallback="local")
         return _eval_task_local(task, agent_fn, project_root, model)
 
-    # Write agent runner script
+    # Parse FAIL_TO_PASS — it is a JSON string in HuggingFace dataset
+    fail_to_pass = task["FAIL_TO_PASS"]
+    if isinstance(fail_to_pass, str):
+        fail_to_pass = json.loads(fail_to_pass)
+
+    anthropic_base_url = os.environ.get("ANTHROPIC_BASE_URL", "http://localhost:4000")
+    anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "sk-local")
+    test_patch = task.get("test_patch", "")
+    problem_statement = task["problem_statement"]
+    fail_to_pass_json = json.dumps(fail_to_pass)
+
+    # Single runner script: apply test_patch → run agent → run pytest (all in one container)
     runner_script = f"""
-import sys, json, os
+import sys, json, os, subprocess
+
+os.environ['ANTHROPIC_BASE_URL'] = {anthropic_base_url!r}
+os.environ['ANTHROPIC_API_KEY'] = {anthropic_api_key!r}
+os.environ['EVOLUTOR_MODEL'] = {model!r}
+no_proxy = 'localhost,127.0.0.1,0.0.0.0,::1'
+os.environ['no_proxy'] = no_proxy
+os.environ['NO_PROXY'] = no_proxy
+
+# Apply test_patch so FAIL_TO_PASS tests exist
+test_patch = {test_patch!r}
+if test_patch.strip():
+    r = subprocess.run('git apply -', shell=True, input=test_patch,
+                       capture_output=True, text=True, cwd='/testbed')
+    if r.returncode != 0:
+        print('WARNING: test_patch apply failed:', r.stderr[:300])
+
+# Install evolutor + deps
+subprocess.run(['pip', 'install', 'anthropic', 'structlog', 'pydantic', '-q'],
+               capture_output=True)
+subprocess.run(['pip', 'install', '-e', '/evolutor', '-q', '--no-deps'],
+               capture_output=True)
+
+# Run agent (solve_task returns git diff string)
 sys.path.insert(0, '/evolutor/src')
-os.environ.setdefault('ANTHROPIC_BASE_URL', '{os.environ.get("ANTHROPIC_BASE_URL", "http://localhost:4000")}')
-os.environ.setdefault('ANTHROPIC_API_KEY', '{os.environ.get("ANTHROPIC_API_KEY", "sk-local")}')
-os.environ.setdefault('EVOLUTOR_MODEL', '{model}')
-from pathlib import Path
-from evolutor.swebench.seed_agent import solve
-result = solve(
-    issue={json.dumps(task["problem_statement"])!r},
-    repo_root=Path('/testbed'),
-    model='{model}',
-    max_steps=30,
+from evolutor.swebench.seed_agent import solve_task
+patch = solve_task(
+    problem_statement={problem_statement!r},
+    repo_dir='/testbed',
+    model={model!r},
 )
-print('AGENT_RESULT:' + json.dumps(result))
+print('PATCH_LINES:', patch.count('\\n'))
+
+# Run FAIL_TO_PASS tests in same container (sees agent edits)
+tests = json.loads({fail_to_pass_json!r})
+r = subprocess.run(
+    ['python3', '-m', 'pytest'] + tests + ['-x', '-q', '--tb=short'],
+    capture_output=True, text=True, cwd='/testbed', timeout=120,
+)
+print('PYTEST_RC:', r.returncode)
+print(r.stdout[-2000:])
+print(r.stderr[-500:])
 """
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(runner_script)
         runner_path = f.name
@@ -188,58 +228,33 @@ print('AGENT_RESULT:' + json.dumps(result))
                 "--network", "host",
                 image,
                 "bash", "-c",
-                "source /opt/miniconda3/bin/activate testbed && "
+                "source /opt/miniconda3/bin/activate testbed 2>/dev/null || true && "
                 "python3 /agent_runner.py",
             ],
-            capture_output=True, text=True, timeout=360,
+            capture_output=True, text=True, timeout=600,
         )
         os.unlink(runner_path)
 
-        if result.returncode != 0:
-            return TaskResult(
-                instance_id=instance_id, passed=False,
-                error=result.stderr[-400:],
-                problem_snippet=task["problem_statement"][:200],
-            )
+        output = result.stdout + result.stderr
+        passed = False
+        for line in output.splitlines():
+            if line.startswith("PYTEST_RC:"):
+                rc = line.split(":", 1)[1].strip()
+                passed = (rc == "0")
+                break
 
-        # Parse agent result
-        agent_out = {}
-        for line in result.stdout.splitlines():
-            if line.startswith("AGENT_RESULT:"):
-                agent_out = json.loads(line[len("AGENT_RESULT:"):])
-
-        # Now run FAIL_TO_PASS tests inside same container with agent's changes
-        # (Agent edits /testbed in-place during run)
-        fail_tests = " ".join(task["FAIL_TO_PASS"])
-        test_result = subprocess.run(
-            [
-                "docker", "run", "--rm",
-                "-v", f"{project_root}:/evolutor:ro",
-                "--network", "host",
-                image,
-                "bash", "-c",
-                "source /opt/miniconda3/bin/activate testbed && "
-                f"python3 -m pytest {fail_tests} -x -q --tb=short 2>&1 | tail -20",
-            ],
-            capture_output=True, text=True, timeout=120,
-        )
-        # Note: agent edits are not persistent across docker run invocations.
-        # The correct approach requires a commit step. For now: check agent reported
-        # success + changed relevant files as proxy.
-        passed = (
-            agent_out.get("success", False)
-            and len(agent_out.get("files_changed", [])) > 0
-        )
         return TaskResult(
             instance_id=instance_id,
             passed=passed,
-            steps=agent_out.get("steps", 0),
-            files_changed=agent_out.get("files_changed", []),
+            error="" if passed else output[-400:],
             problem_snippet=task["problem_statement"][:200],
         )
 
     except subprocess.TimeoutExpired:
-        os.unlink(runner_path)
+        try:
+            os.unlink(runner_path)
+        except Exception:
+            pass
         return TaskResult(instance_id=instance_id, passed=False, error="timeout")
     except Exception as e:
         return TaskResult(instance_id=instance_id, passed=False, error=str(e),
@@ -291,6 +306,8 @@ def _eval_task_local(
 
             # Check FAIL_TO_PASS tests now pass
             fail_tests = task["FAIL_TO_PASS"]
+            if isinstance(fail_tests, str):
+                fail_tests = json.loads(fail_tests)
             test_result = subprocess.run(
                 ["python3", "-m", "pytest"] + fail_tests + ["-x", "-q", "--tb=short"],
                 capture_output=True, text=True, cwd=repo_root, timeout=60,
