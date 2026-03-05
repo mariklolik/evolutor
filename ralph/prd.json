@@ -235,7 +235,7 @@
       "id": "US-212",
       "title": "archive.py — compute_behavior + MAP-Elites behavioral dimensions",
       "phase": 2,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/evolution/archive.py",
       "skills": [
         "/faiss",

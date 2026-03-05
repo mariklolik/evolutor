@@ -2,11 +2,47 @@
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import structlog
 from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
+
+
+def compute_behavior(agent_code: str) -> list[float]:
+    """Compute behavioral dimensions for MAP-Elites.
+
+    Returns [complexity, tool_diversity] as floats in [0, 1].
+
+    complexity:    normalize line count — 50 lines → 0.0, 500 lines → 1.0
+    tool_diversity: count 'def ' definitions in TOOL_TEMPLATES section → normalize /10
+    """
+    lines = agent_code.splitlines()
+    n_lines = len(lines)
+    complexity = min(1.0, max(0.0, (n_lines - 50) / 450.0))
+
+    # Count tool functions in TOOL_TEMPLATES section
+    tool_count = 0
+    try:
+        # Find TOOL_TEMPLATES section between its marker and the next marker
+        marker_re = re.compile(r"# ===== EVOLVABLE SECTION")
+        in_templates = False
+        for line in lines:
+            if "EVOLVABLE SECTION: Tool Templates" in line:
+                in_templates = True
+                continue
+            if in_templates:
+                if marker_re.search(line):
+                    break  # next section reached
+                if line.strip().startswith("def "):
+                    tool_count += 1
+    except Exception:
+        pass
+
+    tool_diversity = min(1.0, tool_count / 10.0)
+    return [complexity, tool_diversity]
 
 
 class ArchiveEntry(BaseModel):
@@ -179,3 +215,33 @@ class EvolutionArchive:
 
     def coverage(self) -> float:
         return self.get_stats().coverage
+
+    # ── MAP-Elites 10×10 grid ────────────────────────────────────────────────
+
+    def _ensure_grid(self) -> None:
+        if not hasattr(self, "_grid"):
+            # dict[cell_index: int] -> (node_id: str, fitness: float)
+            self._grid: dict[int, tuple[str, float]] = {}
+
+    def add_with_behavior(self, node_id: str, fitness: float, agent_code: str) -> None:
+        """Add agent to MAP-Elites grid cell based on behavioral dimensions."""
+        self._ensure_grid()
+        behavior = compute_behavior(agent_code)
+        row = int(behavior[0] * 9.99)
+        col = int(behavior[1] * 9.99)
+        idx = row * 10 + col
+        existing = self._grid.get(idx)
+        if existing is None or fitness > existing[1]:
+            self._grid[idx] = (node_id, fitness)
+            logger.debug("archive_cell_updated", cell=idx, node=node_id, fitness=fitness)
+
+    def get_underexplored_cells(self) -> list[int]:
+        """Return list of cell indices (0-99) with no entries."""
+        self._ensure_grid()
+        return [i for i in range(100) if i not in self._grid]
+
+    def sample_from_cell(self, cell_index: int) -> str | None:
+        """Return node_id from a specific cell, or None if empty."""
+        self._ensure_grid()
+        entry = self._grid.get(cell_index)
+        return entry[0] if entry else None
