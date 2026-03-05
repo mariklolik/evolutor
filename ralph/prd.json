@@ -90,7 +90,7 @@
       "id": "US-205",
       "title": "Task discovery + run_baseline.py script",
       "phase": 0,
-      "passes": false,
+      "passes": true,
       "target_file": "scripts/run_baseline.py",
       "skills": [
         "/vllm"
