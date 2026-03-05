@@ -47,3 +47,52 @@ class PlateauDetector:
 
     def reset(self) -> None:
         self._history.clear()
+
+    def record_batch(self, fitness_values: list[float]) -> None:
+        """Record multiple fitness values at once."""
+        for v in fitness_values:
+            self.record(v)
+
+    def should_diversify(self, window: int = 40) -> bool:
+        """Return True if recent fitness is plateauing."""
+        if len(self._history) < window:
+            return False
+        return self.detect()
+
+
+class DiversificationStrategy:
+    """Diversification via under-explored MAP-Elites cells and wider mutations."""
+
+    def __init__(self, archive, tree) -> None:
+        self.archive = archive
+        self.tree = tree
+
+    def select_diverse_parent(self) -> str:
+        """Pick a parent from an under-explored archive cell, or fall back to Thompson."""
+        try:
+            import random
+            underexplored = self.archive.get_underexplored_cells()
+            if underexplored:
+                # Find occupied cells near under-explored ones
+                occupied = [
+                    i for i in range(100)
+                    if i not in underexplored and self.archive.sample_from_cell(i) is not None
+                ]
+                if occupied:
+                    # Pick a random occupied cell neighboring an under-explored cell
+                    node_id = self.archive.sample_from_cell(random.choice(occupied))
+                    if node_id and node_id in self.tree.nodes:
+                        return node_id
+        except Exception:
+            pass
+        return self.tree.thompson_sample()
+
+    def get_wider_mutation_params(self) -> dict:
+        """Return parameters for more exploratory mutations during plateau."""
+        return {"temperature": 1.5, "force_type": "improve_system_prompt"}
+
+    def apply(self, tree, archive) -> str:
+        """Select diverse parent for evolution during plateau."""
+        self.tree = tree
+        self.archive = archive
+        return self.select_diverse_parent()
