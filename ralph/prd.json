@@ -193,7 +193,7 @@
       "id": "US-210",
       "title": "cascade.py — CascadeResult + CascadingEvaluator with SWE-bench stages",
       "phase": 1,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/evolution/cascade.py",
       "skills": [
         "/grpo-rl-training"

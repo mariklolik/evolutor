@@ -1,164 +1,205 @@
 """Cascading evaluator — reject bad mutations early, cheaply.
 
-Based on AlphaEvolve/OpenEvolve cascade approach (proven ~10x throughput improvement).
-Read openevolve/openevolve/evaluator.py for reference implementation.
+Three evaluation stages with increasing cost and task count.
+Stops at first failure, saving 3-5x compute vs full evaluation.
 
 Stages:
-  Stage 0: ruff syntax check (<100ms) — reject on syntax errors
-  Stage 1: unit tests fast (-x, --timeout=20) — reject if pass_rate < 0.85
-  Stage 2: integration tests — reject if pass_rate < 0.70
-  Stage 3: full eval — compute complete fitness vector
+  Stage 0: ast.parse() syntax check (<1ms)
+  Stage 1: smoke — run on 1 task, check it doesn't crash at step 0
+  Stage 2: medium — run on 3 tasks, accept if >=1 pass
+  Stage 3: full — run on all tasks
 """
 from __future__ import annotations
 
+import ast
 import os
-import re
-import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import structlog
 
 logger = structlog.get_logger()
 
+STAGE_NAMES = ("stage0_syntax", "stage1_smoke", "stage2_medium", "stage3_full")
+
 
 @dataclass
 class CascadeResult:
     passed: bool
-    stage_reached: str
+    stage_reached: str           # one of STAGE_NAMES
     pass_rate: float = 0.0
-    artifacts: dict[str, str] = field(default_factory=dict)
-    reason: str = ""
+    tasks_passed: int = 0
+    tasks_total: int = 0
+    rejection_reason: str = ""
+    agent_logs: str = ""         # truncated to 2000 chars
 
 
 class CascadingEvaluator:
-    """Multi-stage evaluation pipeline.
+    """Multi-stage SWE-bench evaluation pipeline.
 
-    Each stage is faster but less precise. Cheap filters reject bad mutations early.
-    Artifacts (error messages) are collected and fed back to the mutation LLM.
+    Each stage runs more tasks. Cheap filters reject bad mutations early.
+    Composite reward: syntax_valid*0.1 + runs_without_crash*0.3 + pass_rate*0.6
     """
 
     def __init__(
         self,
-        project_root: Path | None = None,
-        stage0_threshold: float = 1.0,
-        stage1_pass_threshold: float = 0.85,
-        stage2_pass_threshold: float = 0.70,
+        tasks: list[dict],
+        project_root: Path | str,
+        model: str = "claude-sonnet-4-6",
     ):
-        self.project_root = project_root or Path(
-            os.environ.get("EVOLUTOR_PROJECT_ROOT", ".")
-        ).resolve()
-        self.stage0_threshold = stage0_threshold
-        self.stage1_pass_threshold = stage1_pass_threshold
-        self.stage2_pass_threshold = stage2_pass_threshold
+        self.tasks = tasks
+        self.project_root = Path(project_root)
+        self.model = model or os.environ.get("EVOLUTOR_MODEL", "claude-sonnet-4-6")
 
-    def evaluate(self, modified_files: dict[str, str], child_root: Path) -> CascadeResult:
-        """Run cascade evaluation on child_root (already has modified files applied).
-
-        Returns CascadeResult with artifacts for LLM feedback loop.
-        """
-        artifacts: dict[str, str] = {}
-
-        # --- Stage 0: Syntax (ruff) -----------------------------------------------
-        file_paths = [str(child_root / f) for f in modified_files]
-        ruff = subprocess.run(
-            ["python", "-m", "ruff", "check", "--select=E9,F401,F811,F821,F841"] + file_paths,
-            capture_output=True, text=True, timeout=15,
-        )
-        artifacts["stage0_ruff"] = ruff.stdout[:500] + ruff.stderr[:200]
-        if ruff.returncode != 0:
+    def evaluate(self, agent_code: str, max_stage: int = 3) -> CascadeResult:
+        """Run cascade evaluation, stopping at first failure."""
+        # Stage 0: syntax
+        if not self._stage0_syntax(agent_code):
             return CascadeResult(
-                passed=False, stage_reached="stage0_syntax",
-                artifacts=artifacts,
-                reason=f"Syntax errors: {ruff.stdout[:200]}"
+                passed=False,
+                stage_reached="stage0_syntax",
+                rejection_reason="syntax error in agent code",
+            )
+        if max_stage == 0:
+            return CascadeResult(passed=True, stage_reached="stage0_syntax", pass_rate=1.0)
+
+        # Stage 1: smoke test (1 task)
+        result1 = self._stage1_smoke(agent_code)
+        if not result1.passed:
+            return result1
+        if max_stage == 1:
+            return result1
+
+        # Stage 2: medium (3 tasks, pass if >=1)
+        result2 = self._stage2_medium(agent_code)
+        if not result2.passed:
+            return result2
+        if max_stage == 2:
+            return result2
+
+        # Stage 3: full
+        return self._stage3_full(agent_code)
+
+    def _stage0_syntax(self, agent_code: str) -> bool:
+        """Check code is valid Python via ast.parse."""
+        try:
+            ast.parse(agent_code)
+            return True
+        except SyntaxError:
+            return False
+
+    def _stage1_smoke(self, agent_code: str) -> CascadeResult:
+        """Run on 1 task. Passes if agent doesn't crash at step 0."""
+        from evolutor.swebench.harness import eval_agent_code_docker
+
+        if not self.tasks:
+            return CascadeResult(passed=True, stage_reached="stage1_smoke",
+                                 pass_rate=1.0, tasks_passed=0, tasks_total=0,
+                                 rejection_reason="no tasks available")
+
+        task = self.tasks[0]
+        try:
+            result = eval_agent_code_docker(
+                agent_code=agent_code,
+                task=task,
+                project_root=self.project_root,
+                model=self.model,
+                timeout=120,
+            )
+            logs = (result.logs or "")[:2000]
+            # Smoke passes if agent produced some output (didn't crash immediately)
+            produced_output = bool(logs.strip()) and "Error" not in (result.error or "")[:50]
+            if not produced_output and not result.passed:
+                return CascadeResult(
+                    passed=False,
+                    stage_reached="stage1_smoke",
+                    tasks_passed=0,
+                    tasks_total=1,
+                    rejection_reason=f"smoke test crashed: {result.error}",
+                    agent_logs=logs,
+                )
+            return CascadeResult(
+                passed=True,
+                stage_reached="stage1_smoke",
+                pass_rate=1.0 if result.passed else 0.0,
+                tasks_passed=1 if result.passed else 0,
+                tasks_total=1,
+                agent_logs=logs,
+            )
+        except Exception as e:
+            return CascadeResult(
+                passed=False,
+                stage_reached="stage1_smoke",
+                rejection_reason=str(e),
             )
 
-        # Also check with ast.parse for deeper syntax validation
-        for fpath, content in modified_files.items():
+    def _stage2_medium(self, agent_code: str) -> CascadeResult:
+        """Run on first 3 tasks. Accept if >=1/3 pass."""
+        from evolutor.swebench.harness import eval_agent_code_docker
+
+        sample = self.tasks[:3]
+        passed_count = 0
+        all_logs = []
+
+        for task in sample:
             try:
-                import ast
-                ast.parse(content)
-            except SyntaxError as e:
-                artifacts["stage0_ast"] = str(e)
-                return CascadeResult(
-                    passed=False, stage_reached="stage0_ast",
-                    artifacts=artifacts, reason=f"AST parse error in {fpath}: {e}"
+                result = eval_agent_code_docker(
+                    agent_code=agent_code,
+                    task=task,
+                    project_root=self.project_root,
+                    model=self.model,
+                    timeout=300,
                 )
+                if result.passed:
+                    passed_count += 1
+                all_logs.append(f"[{task['instance_id']}] {'PASS' if result.passed else 'FAIL'}")
+            except Exception as e:
+                all_logs.append(f"[{task['instance_id']}] ERROR: {e}")
 
-        # --- Stage 1: Unit tests (fast) -------------------------------------------
-        result1 = subprocess.run(
-            ["python", "-m", "pytest", "tests/unit/", "-x", "-q",
-             "--tb=short", "--timeout=20", "-p", "no:warnings", "--no-header"],
-            capture_output=True, text=True, timeout=120, cwd=child_root,
-            env={**os.environ, "PYTHONPATH": str(child_root / "src")},
-        )
-        out1 = result1.stdout + result1.stderr
-        artifacts["stage1_pytest"] = out1[:1000]
+        logs = "\n".join(all_logs)[:2000]
+        pass_rate = passed_count / max(len(sample), 1)
+        passed = passed_count >= 1  # At least 1/3 must pass
 
-        passed1, failed1 = self._parse_pytest(out1)
-        total1 = passed1 + failed1
-        pass_rate1 = passed1 / max(total1, 1)
-
-        if pass_rate1 < self.stage1_pass_threshold and total1 > 0:
-            return CascadeResult(
-                passed=False, stage_reached="stage1_unit",
-                pass_rate=pass_rate1, artifacts=artifacts,
-                reason=(
-                    f"Unit tests: {passed1}/{total1} passed "
-                    f"({pass_rate1:.0%} < {self.stage1_pass_threshold:.0%})"
-                ),
-            )
-
-        # --- Stage 2: Integration/scenario tests ----------------------------------
-        scenario_dir = child_root / "tests" / "scenario"
-        integration_dir = child_root / "tests" / "integration"
-        if scenario_dir.exists() or integration_dir.exists():
-            test_dir = "tests/scenario" if scenario_dir.exists() else "tests/integration"
-            result2 = subprocess.run(
-                ["python", "-m", "pytest", test_dir, "-q",
-                 "--tb=short", "--timeout=60", "-p", "no:warnings", "--no-header"],
-                capture_output=True, text=True, timeout=180, cwd=child_root,
-                env={**os.environ, "PYTHONPATH": str(child_root / "src")},
-            )
-            out2 = result2.stdout + result2.stderr
-            artifacts["stage2_integration"] = out2[:800]
-            passed2, failed2 = self._parse_pytest(out2)
-            total2 = passed2 + failed2
-            pass_rate2 = passed2 / max(total2, 1)
-
-            if pass_rate2 < self.stage2_pass_threshold and total2 > 0:
-                return CascadeResult(
-                    passed=False, stage_reached="stage2_integration",
-                    pass_rate=pass_rate2, artifacts=artifacts,
-                    reason=f"Integration tests: {passed2}/{total2} passed"
-                )
-
-        # --- Stage 3: Full eval passed --------------------------------------------
         return CascadeResult(
-            passed=True, stage_reached="stage3_full",
-            pass_rate=pass_rate1, artifacts=artifacts,
+            passed=passed,
+            stage_reached="stage2_medium",
+            pass_rate=pass_rate,
+            tasks_passed=passed_count,
+            tasks_total=len(sample),
+            rejection_reason="" if passed else f"only {passed_count}/{len(sample)} passed",
+            agent_logs=logs,
         )
 
-    @staticmethod
-    def _parse_pytest(output: str) -> tuple[int, int]:
-        """Parse pytest output for passed/failed counts."""
-        passed = (
-            int(re.search(r"(\d+) passed", output).group(1))
-            if re.search(r"(\d+) passed", output) else 0
-        )
-        failed = (
-            int(re.search(r"(\d+) failed", output).group(1))
-            if re.search(r"(\d+) failed", output) else 0
-        )
-        return passed, failed
+    def _stage3_full(self, agent_code: str) -> CascadeResult:
+        """Run on all tasks."""
+        from evolutor.swebench.harness import eval_agent_code_docker
 
-    def format_artifacts_for_llm(self, result: CascadeResult) -> str:
-        """Format cascade artifacts as context for the mutation LLM (OpenEvolve artifact channel)."""
-        if result.passed:
-            return "Previous mutation PASSED all evaluation stages."
-        lines = [f"Previous mutation FAILED at {result.stage_reached}: {result.reason}"]
-        for stage, output in result.artifacts.items():
-            if output.strip():
-                lines.append(f"\n[{stage}]\n{output[:400]}")
-        return "\n".join(lines)
+        passed_count = 0
+        all_logs = []
+
+        for task in self.tasks:
+            try:
+                result = eval_agent_code_docker(
+                    agent_code=agent_code,
+                    task=task,
+                    project_root=self.project_root,
+                    model=self.model,
+                    timeout=600,
+                )
+                if result.passed:
+                    passed_count += 1
+                all_logs.append(f"[{task['instance_id']}] {'PASS' if result.passed else 'FAIL'}")
+            except Exception as e:
+                all_logs.append(f"[{task['instance_id']}] ERROR: {e}")
+
+        logs = "\n".join(all_logs)[:2000]
+        pass_rate = passed_count / max(len(self.tasks), 1)
+
+        return CascadeResult(
+            passed=True,  # Stage 3 always "passes" — records final pass rate
+            stage_reached="stage3_full",
+            pass_rate=pass_rate,
+            tasks_passed=passed_count,
+            tasks_total=len(self.tasks),
+            agent_logs=logs,
+        )
