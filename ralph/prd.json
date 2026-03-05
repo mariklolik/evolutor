@@ -295,7 +295,7 @@
       "id": "US-215",
       "title": "loop.py — EvolutionConfig + EvolutionReport + remove legacy code",
       "phase": 2,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/evolution/loop.py",
       "skills": [],
       "required_reading": [
