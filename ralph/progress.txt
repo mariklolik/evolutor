@@ -11,3 +11,4 @@ DONE: US-207: tree.py CMP Thompson sampling + expansion + get_best_agent (2026-0
 DONE: US-208: mutator.py MutationType+DIAGNOSIS_PROMPT+extract (2026-03-06 01:21)
 DONE: US-209: mutator.py diagnose_and_mutate (2026-03-06 01:22)
 DONE: US-210: cascade.py CascadeResult+CascadingEvaluator (2026-03-06 01:23)
+DONE: US-211: test_evolution.py 17 tests (2026-03-06 01:25)
