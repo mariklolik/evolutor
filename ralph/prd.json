@@ -128,7 +128,7 @@
       "id": "US-207",
       "title": "tree.py — CMP Thompson sampling + expansion rule + get_best_agent",
       "phase": 1,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/evolution/tree.py",
       "skills": [],
       "required_reading": [

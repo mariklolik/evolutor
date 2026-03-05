@@ -10,6 +10,8 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
+import numpy as np
+
 
 @dataclass
 class EvolutionNode:
@@ -129,6 +131,75 @@ class EvolutionTree:
             if task["instance_id"] not in evaluated:
                 return task
         return None
+
+    def get_descendant_evals(self, node_id: str, num_pseudo: int = 10) -> list[float]:
+        """HGM CMP: recursively collect descendant utility measures.
+
+        For the current node:
+          - 0 evals: contribute empty list
+          - 1..num_pseudo-1 evals: contribute [mean_utility]*num_pseudo (pseudo-counts)
+          - >= num_pseudo evals: contribute raw utility_measures
+        Then recurse into all children and extend with their raw utility_measures.
+        """
+        node = self.nodes[node_id]
+        if node.num_evals == 0:
+            evals: list[float] = []
+        elif node.num_evals < num_pseudo:
+            evals = [node.mean_utility] * num_pseudo
+        else:
+            evals = list(node.utility_measures)
+
+        for child_id in node.children:
+            child = self.nodes[child_id]
+            evals.extend(child.utility_measures)
+            # Recurse into grandchildren
+            for grandchild_id in child.children:
+                evals.extend(self.get_descendant_evals(grandchild_id, num_pseudo))
+
+        return evals
+
+    def thompson_sample(self, for_expansion: bool = True) -> str:
+        """Select node via Thompson sampling (HGM CMP with tau cooling).
+
+        tau = eval_budget / max(1, eval_budget - n_evals)
+        For expansion: use CMP descendant evals.
+        For measurement: use node's own utility_measures.
+        """
+        tau = self.eval_budget / max(1, self.eval_budget - self.n_evals)
+        best_theta = -1.0
+        best_id = "root"
+
+        for node_id, node in self.nodes.items():
+            if for_expansion:
+                evals = self.get_descendant_evals(node_id)
+            else:
+                evals = list(node.utility_measures)
+
+            successes = sum(evals)
+            failures = len(evals) - successes
+            alpha = tau * (1 + successes)
+            beta_param = tau * (1 + failures)
+            theta = float(np.random.beta(max(alpha, 0.01), max(beta_param, 0.01)))
+            if theta > best_theta:
+                best_theta = theta
+                best_id = node_id
+
+        return best_id
+
+    def should_expand(self, alpha: float = 0.6) -> bool:
+        """HGM expansion rule: n_evals^alpha >= n_nodes (excluding root)."""
+        n_nodes = len(self.nodes) - 1
+        return self.n_evals ** alpha >= n_nodes
+
+    def get_best_agent(self) -> EvolutionNode:
+        """Return node with highest mean_utility among nodes with >=3 evals."""
+        candidates = [
+            node for node in self.nodes.values()
+            if node.num_evals >= 3
+        ]
+        if not candidates:
+            return self.nodes["root"]
+        return max(candidates, key=lambda n: n.mean_utility)
 
     def save_state(self, path: str) -> None:
         """Serialize tree to JSON file."""
