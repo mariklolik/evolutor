@@ -338,7 +338,7 @@
       "id": "US-217",
       "title": "scripts/run_evolution.py + scripts/compare_results.py",
       "phase": 3,
-      "passes": false,
+      "passes": true,
       "target_file": "scripts/run_evolution.py",
       "skills": [
         "/mlflow"
