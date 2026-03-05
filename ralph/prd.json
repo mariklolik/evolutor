@@ -171,7 +171,7 @@
       "id": "US-209",
       "title": "mutator.py — diagnose_and_mutate with LLM call",
       "phase": 1,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/evolution/mutator.py",
       "skills": [
         "/claude-api",

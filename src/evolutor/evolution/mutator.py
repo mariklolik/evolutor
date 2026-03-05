@@ -5,9 +5,12 @@ mutation types, output the complete modified seed_agent.py.
 """
 from __future__ import annotations
 
+import ast
 import os
 import re
 from enum import Enum
+
+import anthropic
 
 import structlog
 
@@ -124,6 +127,74 @@ class Mutator:
         # Last resort: return fallback
         logger.warning("extract_code_fallback", text_len=len(text))
         return fallback_code or text.strip()
+
+    def select_mutation_type(self, failure_text: str) -> str:
+        """Heuristic: pick mutation type from failure text keywords."""
+        t = failure_text.lower()
+        if "exit" in t or "step 0" in t:
+            return "improve_system_prompt"
+        if "loop" in t or "repeat" in t:
+            return "improve_reflection"
+        if "timeout" in t or "timed out" in t:
+            return "optimize_parameters"
+        return "improve_system_prompt"
+
+    def diagnose_and_mutate(
+        self,
+        parent_code: str,
+        failed_task_logs: str,
+    ) -> tuple[str, str, str]:
+        """LLM-powered mutation with structured diagnosis.
+
+        Returns (child_code, mutation_type_str, description_str).
+        Falls back to parent_code on syntax errors or LLM failures.
+        """
+        prompt = DIAGNOSIS_PROMPT.format(
+            agent_code=parent_code,
+            failed_task_logs=failed_task_logs[:50000],
+        )
+
+        client = anthropic.Anthropic()
+        model = os.environ.get("EVOLUTOR_MODEL", "claude-sonnet-4-6")
+
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=8192,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text
+
+            # Parse mutation type
+            mutation_type_str = self.select_mutation_type(failed_task_logs)
+            for line in text.splitlines():
+                if line.startswith("MUTATION_TYPE:"):
+                    mutation_type_str = line.split(":", 1)[1].strip()
+                    break
+
+            # Parse analysis/description
+            description = ""
+            for line in text.splitlines():
+                if line.startswith("ANALYSIS:"):
+                    description = line.split(":", 1)[1].strip()
+                    break
+
+            # Extract code
+            child_code = self.extract_code_from_response(text, fallback_code=parent_code)
+
+            # Validate extracted code with ast.parse
+            try:
+                ast.parse(child_code)
+            except SyntaxError:
+                logger.warning("mutation_syntax_error", keeping="parent")
+                return parent_code, "optimize_parameters", "syntax error in mutation, keeping parent"
+
+            logger.info("mutation_ok", mut_type=mutation_type_str, code_len=len(child_code))
+            return child_code, mutation_type_str, description
+
+        except Exception as e:
+            logger.error("diagnose_and_mutate_error", error=str(e))
+            return parent_code, "optimize_parameters", f"mutation failed: {e}"
 
     def mutate(
         self,
