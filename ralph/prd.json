@@ -314,7 +314,7 @@
       "id": "US-216",
       "title": "loop.py — run_evolution main HGM loop",
       "phase": 2,
-      "passes": false,
+      "passes": true,
       "target_file": "src/evolutor/evolution/loop.py",
       "skills": [
         "/mlflow",
