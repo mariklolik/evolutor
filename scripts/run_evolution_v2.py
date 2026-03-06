@@ -22,13 +22,15 @@ def main():
     parser.add_argument("--budget", type=int, default=50, help="Total eval budget")
     parser.add_argument("--cascade-stage", type=int, default=1, help="Max cascade stage (0=syntax, 1=smoke)")
     parser.add_argument("--tasks", type=int, default=0, help="Number of tasks (0=all)")
+    parser.add_argument("--seed", type=str, default=None, help="Path to seed agent (default: seed_agent.py)")
     args = parser.parse_args()
 
     tasks = json.load(open(TASKS_FILE))
     if args.tasks > 0:
         tasks = tasks[:args.tasks]
 
-    seed_code = open(SEED_AGENT_PATH).read()
+    seed_path = args.seed or str(SEED_AGENT_PATH)
+    seed_code = open(seed_path).read()
 
     config = EvolutionConfig(
         eval_budget=args.budget,
