@@ -1,0 +1,167 @@
+{
+  "timestamp": "2026-03-06 04:03:16",
+  "model": "claude-sonnet-4-6",
+  "agent": "best_evolved_51339c21",
+  "total_tasks": 26,
+  "completed": 26,
+  "passed": 4,
+  "pass_rate": 0.1538,
+  "results": [
+    {
+      "instance_id": "pytest-dev__pytest-5221",
+      "passed": false,
+      "time_seconds": 45.4,
+      "error": "ROR>     for baseid, module, bestrel, argname, fixturedef in available:\nINTERNALERROR> ValueError: too many values to unpack (expected 5)\n\n========================= no tests ran in 0.00 seconds =========================\n=========================== short test summary info ============================\nFAILED testing/python/fixtures.py::TestShowFixtures::test_show_fixtures\n1 failed in 0.28 seconds\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7432",
+      "passed": false,
+      "time_seconds": 51.5,
+      "error": "est/skipping.py:239: unconditional skip\n============================== 1 skipped in 0.00s ==============================\n=========================== short test summary info ============================\nFAILED testing/test_skipping.py::TestXFail::test_xfail_run_with_skip_mark[test_input1-expected1]\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.09s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7373",
+      "passed": false,
+      "time_seconds": 28.7,
+      "error": "PATCH_LINES: 35\nPYTEST_RC: 4\n\nno tests ran in 0.04s\n\nERROR: not found: /testbed/testing/test_mark.py::TestFunctional::test_reevaluate_dynamic_expr\n(no name '/testbed/testing/test_mark.py::TestFunctional::test_reevaluate_dynamic_expr' in any of [<Instance ()>])\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5692",
+      "passed": true,
+      "time_seconds": 51.4,
+      "error": ""
+    },
+    {
+      "instance_id": "psf__requests-2148",
+      "passed": false,
+      "time_seconds": 47.3,
+      "error": " isinstance(hook, collections.Callable):\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED test_requests.py::RequestsTestCase::test_iter_content_handles_socket_error\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed, 8 passed, 4 warnings in 6.26s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5103",
+      "passed": false,
+      "time_seconds": 64.6,
+      "error": "urn cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))\n  File \"/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/anthropic/_base_client.py\", line 1137, in request\n    raise self._make_status_error_from_response(err.response) from None\nanthropic.InternalServerError: Error code: 500 - {'error': {'message': 'HTTP Error 400: Bad Request', 'type': 'proxy_error'}}\n"
+    },
+    {
+      "instance_id": "psf__requests-2674",
+      "passed": false,
+      "time_seconds": 44.1,
+      "error": "rking\n    if isinstance(hook, collections.Callable):\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED test_requests.py::RequestsTestCase::test_BASICAUTH_TUPLE_HTTP_200_OK_GET\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed, 3 warnings in 0.64s\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-2317",
+      "passed": false,
+      "time_seconds": 35.1,
+      "error": "deprecated since Python 3.3, and in 3.10 it will stop working\n    from collections import Mapping, MutableMapping\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n2 warnings in 0.12s\n\nERROR: not found: /testbed/test_requests.py::TestTimeout::test_encoded_methods\n(no name '/testbed/test_requests.py::TestTimeout::test_encoded_methods' in any of [<Module test_requests.py>])\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7490",
+      "passed": false,
+      "time_seconds": 57.7,
+      "error": "_during_runtest_failed.py::test_this - assert 0\n============================== 1 failed in 0.02s ===============================\n=========================== short test summary info ============================\nFAILED testing/test_skipping.py::TestXFail::test_dynamic_xfail_set_during_runtest_failed\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.10s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5227",
+      "passed": true,
+      "time_seconds": 19.9,
+      "error": ""
+    },
+    {
+      "instance_id": "pytest-dev__pytest-8906",
+      "passed": false,
+      "time_seconds": 45.4,
+      "error": "rrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n=============================== 1 error in 0.05s ===============================\n=========================== short test summary info ============================\nFAILED testing/test_skipping.py::test_module_level_skip_error - Failed: nomat...\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.12s\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-3362",
+      "passed": false,
+      "time_seconds": 62.9,
+      "error": "    from collections import Mapping, MutableMapping\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED tests/test_requests.py::TestRequests::test_response_decode_unicode - a...\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed, 2 warnings in 0.07s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-6116",
+      "passed": false,
+      "time_seconds": 40.8,
+      "error": "INTERNALERROR>   File \"/testbed/src/_pytest/terminal.py\", line 619, in pytest_collection_finish\nINTERNALERROR>     if self.config.getoption(\"collectonly\"):\nINTERNALERROR>   File \"/testbed/src/_pytest/config/__init__.py\", line 1067, in getoption\nINTERNALERROR>     raise ValueError(\"no option named {!r}\".format(name))\nINTERNALERROR> ValueError: no option named 'collectonly'\n\nno tests ran in 0.09s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7220",
+      "passed": false,
+      "time_seconds": 66.3,
+      "error": "ith_changed_cwd.py::test_show_wrong_path - assert False\n============================== 1 failed in 0.03s ===============================\n=========================== short test summary info ============================\nFAILED testing/test_nodes.py::test_failure_with_changed_cwd - Failed: nomatch...\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.05s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-8365",
+      "passed": false,
+      "time_seconds": 13.2,
+      "error": "r\n    self._accessor.mkdir(self, mode)\nE   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pytest-of-os/<:*?;>agnostic'\n=========================== short test summary info ============================\nFAILED testing/test_tmpdir.py::test_tmp_path_factory_handles_invalid_dir_characters\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.06s\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-863",
+      "passed": false,
+      "time_seconds": 46.6,
+      "error": ".py::RequestsTestSuite::test_POSTBIN_GET_POST_FILES_WITH_HEADERS\n\nERROR: found no collectors for /testbed/tests/test_requests.py::RequestsTestSuite::test_nonurlencoded_postdata\n\nERROR: found no collectors for /testbed/tests/test_requests.py::RequestsTestSuite::test_prefetch_redirect_bug\n\nERROR: found no collectors for /testbed/tests/test_requests.py::RequestsTestSuite::test_urlencoded_post_data\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5413",
+      "passed": false,
+      "time_seconds": 46.0,
+      "error": "ror tblen=4>\"\nE   AssertionError: assert '/testbed/tes...8: ValueError' == '<ExceptionInf...rror tblen=4>'\nE     - /testbed/testing/code/test_excinfo.py:98: ValueError\nE     + <ExceptionInfo ValueError tblen=4>\n=========================== short test summary info ============================\nFAILED testing/code/test_excinfo.py::test_excinfo_repr_str - AssertionError: ...\n1 failed in 0.13 seconds\n\n\n"
+    },
+    {
+      "instance_id": "pallets__flask-4992",
+      "passed": false,
+      "time_seconds": 46.3,
+      "error": ":43: in test_config_from_file_toml\n    app.config.from_file(\nE   TypeError: Config.from_file() got an unexpected keyword argument 'text'\n=========================== short test summary info ============================\nFAILED tests/test_config.py::test_config_from_file_toml - TypeError: Config.f...\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.04s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5495",
+      "passed": true,
+      "time_seconds": 60.3,
+      "error": ""
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7168",
+      "passed": false,
+      "time_seconds": 81.8,
+      "error": "urn cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))\n  File \"/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/anthropic/_base_client.py\", line 1137, in request\n    raise self._make_status_error_from_response(err.response) from None\nanthropic.InternalServerError: Error code: 500 - {'error': {'message': 'HTTP Error 400: Bad Request', 'type': 'proxy_error'}}\n"
+    },
+    {
+      "instance_id": "pallets__flask-5063",
+      "passed": false,
+      "time_seconds": 73.3,
+      "error": "                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/miniconda3/envs/testbed/lib/python3.11/site-packages/anthropic/_base_client.py\", line 1137, in request\n    raise self._make_status_error_from_response(err.response) from None\nanthropic.InternalServerError: Error code: 500 - {'error': {'message': 'HTTP Error 400: Bad Request', 'type': 'proxy_error'}}\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-9359",
+      "passed": false,
+      "time_seconds": 63.4,
+      "error": "in <module>\n    from _pytest._code import ExceptionInfo\n  File \"/testbed/src/_pytest/_code/__init__.py\", line 2, in <module>\n    from .code import Code\n  File \"/testbed/src/_pytest/_code/code.py\", line 38, in <module>\n    from _pytest._code.source import findsource\n  File \"/testbed/src/_pytest/_code/source.py\", line 146\n    values.append(val[0].lineno - 1 - 1)\nIndentationError: unexpected indent\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-11143",
+      "passed": false,
+      "time_seconds": 40.3,
+      "error": "PATCH_LINES: 20\nPYTEST_RC: 4\n\nno tests ran in 0.09s\n\nERROR: not found: /testbed/testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring\n(no name '/testbed/testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring' in any of [<Module testing/test_assertrewrite.py>])\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-11148",
+      "passed": false,
+      "time_seconds": 41.0,
+      "error": "revious_imports' from '/tmp/pytest-of-root/pytest-0/test_remembers_previous_import0/_src/tests/mymod_test_remembers_previous_imports.py'>\n=========================== short test summary info ============================\nFAILED testing/test_pathlib.py::TestImportPath::test_remembers_previous_imports\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.11s\n\n\n"
+    },
+    {
+      "instance_id": "pallets__flask-4045",
+      "passed": false,
+      "time_seconds": 44.8,
+      "error": "lueprints.py:256: in test_dotted_name_not_allowed\n    flask.Blueprint(\"app.ui\", __name__)\nE   Failed: DID NOT RAISE <class 'ValueError'>\n=========================== short test summary info ============================\nFAILED tests/test_blueprints.py::test_dotted_name_not_allowed - Failed: DID N...\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.06s\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-1963",
+      "passed": true,
+      "time_seconds": 52.9,
+      "error": ""
+    }
+  ]
+}

@@ -29,22 +29,59 @@ WORKFLOW (follow this order):
 1. UNDERSTAND: Read the issue carefully. Find the relevant source files.
    - Use `find . -type f -name "*.py" | head -20` to see project structure
    - Use `grep -rn "keyword" --include="*.py"` to find relevant code
+   - If there are test failures, read the error messages carefully
+   - Identify what the expected behavior should be vs. actual behavior
+   - For pytest issues specifically:
+     * Reproduce the exact failing test with `pytest <test_file>::<test_name> -v`
+     * Read pytest's detailed error output including assertion rewriting
+     * Understand pytest fixtures and their scope
+     * Check if the issue is with test discovery or execution
+     * When assertion rewriting is involved, examine the actual source lines that fail
+     * For complex pytest issues, consider looking at the pytest source code for similar patterns
+   - If the issue involves a failing test case:
+     * First reproduce the failure by running the specific test
+     * Understand what the test expects vs what it gets
+     * Identify the exact assertion that's failing
+     * Make minimal changes that address the root cause
 2. LOCATE: Find the exact file and line that needs changing.
    - Read the file with `cat -n <file>` to see line numbers
+   - Look for functions, classes, or methods mentioned in the issue
+   - If it's a logic error, trace through the execution path
+   - For pytest issues, examine the test structure and how it interacts with the codebase
+   - Pay special attention to how pytest fixtures are defined and used
 3. FIX: Make a minimal, targeted edit using sed or python:
    - `sed -i 's/old/new/' file.py` for simple replacements
    - For multi-line edits, use a Python script: `python3 -c "..."`
    - NEVER leave syntax errors. After editing, ALWAYS verify with `python3 -c "import <module>"`
+   - If fixing a logic error, consider edge cases and write minimal test cases
+   - For pytest-specific fixes, ensure the fix doesn't break test fixtures or test discovery
+   - When fixing assertion rewriting issues, make sure the fix preserves the intended semantics
 4. TEST: Verify your fix works:
    - `python3 -c "import <module>"` to check no syntax errors
    - Run related tests if you know them
+   - If there are existing tests, run them to ensure nothing breaks
+   - Specifically re-run the failing test to confirm it now passes
+   - For pytest, run with `-v` flag to see verbose output and ensure test passes
+   - When fixing pytest issues, also run the full test suite to avoid regressions
 5. VERIFY: Check your changes with `git diff`
 
 CRITICAL RULES:
 - Make SMALL, FOCUSED changes. Do NOT rewrite entire files.
 - ALWAYS check syntax after editing: `python3 -c "import <module>"`
 - If your first approach fails, try a different approach.
-- Do NOT give up. Keep trying different fixes until the issue is resolved."""
+- Do NOT give up. Keep trying different fixes until the issue is resolved.
+- When in doubt, create a small test script to validate your understanding before making changes.
+- When fixing test failures, ensure your fix makes the specific failing assertion pass while not breaking other functionality.
+- For pytest issues:
+  - Always reproduce the exact failing test before fixing
+  - Pay attention to pytest's assertion rewriting and error messages
+  - Ensure test fixtures still work correctly after changes
+  - When in doubt, examine pytest's own test patterns for similar issues
+
+If the issue involves a failing test case:
+- First reproduce the failure by running the specific test
+- Understand what the test expects vs what it gets
+- Fix only what's necessary to make the test pass"""
 
 # ===== EVOLVABLE SECTION: Reflection Prompt =====
 REFLECTION_PROMPT = """Stop and reflect:

@@ -13,8 +13,10 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 CLAUDE_PROMPT="$SCRIPT_DIR/CLAUDE.md"
-MODEL="claude-opus-4-6"
+MODEL="${RALPH_MODEL:-claude-sonnet-4-6}"
 MAX_ITERATIONS="${1:-100}"
+LOG_DIR="$SCRIPT_DIR/logs"
+mkdir -p "$LOG_DIR"
 
 # Validate required files
 for f in "$PRD_FILE" "$PROGRESS_FILE" "$CLAUDE_PROMPT"; do
@@ -81,6 +83,8 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   fi
 
   # Spawn a FRESH Claude instance
+  ITER_LOG="$LOG_DIR/iter_$(printf '%03d' $i)_$(date '+%H%M%S').log"
+  echo "Log: $ITER_LOG"
   OUTPUT=$(cd "$PROJECT_DIR" && \
     env -u CLAUDECODE \
     CLAUDE_CODE_BLOCKING_LIMIT_OVERRIDE="197000" \
@@ -89,7 +93,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
       --dangerously-skip-permissions \
       --model "$MODEL" \
       --print \
-      < "$CLAUDE_PROMPT" 2>&1 | tee /dev/stderr) || true
+      < "$CLAUDE_PROMPT" 2>&1 | tee "$ITER_LOG" | tee /dev/stderr) || true
 
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then

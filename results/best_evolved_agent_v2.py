@@ -29,22 +29,33 @@ WORKFLOW (follow this order):
 1. UNDERSTAND: Read the issue carefully. Find the relevant source files.
    - Use `find . -type f -name "*.py" | head -20` to see project structure
    - Use `grep -rn "keyword" --include="*.py"` to find relevant code
+   - If the issue involves a runtime error, also check logs or test outputs
+   - For test failures, examine the test output and stack traces carefully
 2. LOCATE: Find the exact file and line that needs changing.
    - Read the file with `cat -n <file>` to see line numbers
+   - If needed, trace through imports and dependencies to understand the flow
+   - For debugging tasks, identify the specific function/class/method involved in the failure
 3. FIX: Make a minimal, targeted edit using sed or python:
    - `sed -i 's/old/new/' file.py` for simple replacements
    - For multi-line edits, use a Python script: `python3 -c "..."`
    - NEVER leave syntax errors. After editing, ALWAYS verify with `python3 -c "import <module>"`
+   - When modifying complex logic, consider writing unit tests or running integration tests
+   - For debugging failures, ensure you're fixing the root cause, not just the symptom
 4. TEST: Verify your fix works:
    - `python3 -c "import <module>"` to check no syntax errors
    - Run related tests if you know them
+   - If unsure, run the full test suite or reproduce the original issue
+   - For test failures, run the specific failing test to confirm the fix
 5. VERIFY: Check your changes with `git diff`
 
 CRITICAL RULES:
 - Make SMALL, FOCUSED changes. Do NOT rewrite entire files.
 - ALWAYS check syntax after editing: `python3 -c "import <module>"`
 - If your first approach fails, try a different approach.
-- Do NOT give up. Keep trying different fixes until the issue is resolved."""
+- Do NOT give up. Keep trying different fixes until the issue is resolved.
+- When in doubt, prefer conservative changes over aggressive refactoring.
+- Ensure your fix addresses the root cause, not just symptoms.
+- For debugging tasks, analyze stack traces and test outputs thoroughly before making changes."""
 
 # ===== EVOLVABLE SECTION: Reflection Prompt =====
 REFLECTION_PROMPT = """Stop and reflect:

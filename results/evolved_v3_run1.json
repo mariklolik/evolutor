@@ -1,0 +1,167 @@
+{
+  "run_id": 1,
+  "timestamp": "2026-03-06 06:06:12",
+  "model": "claude-sonnet-4-6",
+  "total_tasks": 26,
+  "completed": 26,
+  "passed": 3,
+  "pass_rate": 0.1154,
+  "results": [
+    {
+      "instance_id": "pytest-dev__pytest-5221",
+      "passed": true,
+      "time_seconds": 43.8,
+      "error": ""
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7432",
+      "passed": false,
+      "time_seconds": 69.3,
+      "error": "est/skipping.py:239: unconditional skip\n============================== 1 skipped in 0.00s ==============================\n=========================== short test summary info ============================\nFAILED testing/test_skipping.py::TestXFail::test_xfail_run_with_skip_mark[test_input1-expected1]\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.08s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7373",
+      "passed": false,
+      "time_seconds": 48.6,
+      "error": "PATCH_LINES: 32\nPYTEST_RC: 4\n\nno tests ran in 0.04s\n\nERROR: not found: /testbed/testing/test_mark.py::TestFunctional::test_reevaluate_dynamic_expr\n(no name '/testbed/testing/test_mark.py::TestFunctional::test_reevaluate_dynamic_expr' in any of [<Instance ()>])\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5692",
+      "passed": false,
+      "time_seconds": 61.1,
+      "error": "                                     [100%]\n\n- generated xml file: /tmp/pytest-of-root/pytest-0/test_hostname_in_xml0/junit.xml -\n=========================== 1 passed in 0.01 seconds ===========================\n=========================== short test summary info ============================\nFAILED testing/test_junitxml.py::TestPython::test_hostname_in_xml - Assertion...\n1 failed in 0.12 seconds\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-2148",
+      "passed": false,
+      "time_seconds": 59.3,
+      "error": "/testbed/test_requests.py::RequestsTestCase::test_cookie_quote_wrapped\n\nERROR: found no collectors for /testbed/test_requests.py::RequestsTestCase::test_generic_cookiejar_works\n\nERROR: found no collectors for /testbed/test_requests.py::RequestsTestCase::test_iter_content_handles_socket_error\n\nERROR: found no collectors for /testbed/test_requests.py::RequestsTestCase::test_unicode_multipart_post\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5103",
+      "passed": false,
+      "time_seconds": 123.6,
+      "error": "PATCH_LINES: 15\nPYTEST_RC: 4\n\nno tests ran in 0.13 seconds\n\nERROR: not found: /testbed/testing/test_assertrewrite.py::TestAssertionRewrite::test_unroll_expression\n(no name '/testbed/testing/test_assertrewrite.py::TestAssertionRewrite::test_unroll_expression' in any of [<Instance ()>])\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-2674",
+      "passed": false,
+      "time_seconds": 74.1,
+      "error": "table\n\nERROR: found no collectors for /testbed/test_requests.py::RequestsTestCase::test_prepared_from_session\n\nERROR: found no collectors for /testbed/test_requests.py::RequestsTestCase::test_unicode_multipart_post\n\nERROR: found no collectors for /testbed/test_requests.py::TestTimeout::test_none_timeout\n\nERROR: found no collectors for /testbed/test_requests.py::TestTimeout::test_encoded_methods\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-2317",
+      "passed": false,
+      "time_seconds": 80.3,
+      "error": "deprecated since Python 3.3, and in 3.10 it will stop working\n    from collections import Mapping, MutableMapping\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n2 warnings in 0.12s\n\nERROR: not found: /testbed/test_requests.py::TestTimeout::test_encoded_methods\n(no name '/testbed/test_requests.py::TestTimeout::test_encoded_methods' in any of [<Module test_requests.py>])\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7490",
+      "passed": false,
+      "time_seconds": 72.2,
+      "error": "_during_runtest_failed.py::test_this - assert 0\n============================== 1 failed in 0.02s ===============================\n=========================== short test summary info ============================\nFAILED testing/test_skipping.py::TestXFail::test_dynamic_xfail_set_during_runtest_failed\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.10s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5227",
+      "passed": true,
+      "time_seconds": 31.7,
+      "error": ""
+    },
+    {
+      "instance_id": "pytest-dev__pytest-8906",
+      "passed": false,
+      "time_seconds": 60.6,
+      "error": "module_level_skip_error0\ncollected 0 items / 1 skipped\n\n============================== 1 skipped in 0.00s ==============================\n=========================== short test summary info ============================\nFAILED testing/test_skipping.py::test_module_level_skip_error - Failed: nomat...\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.09s\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-3362",
+      "passed": false,
+      "time_seconds": 79.4,
+      "error": "   from requests.packages import urllib3 as urllib3_bundle\nrequests/__init__.py:64: in <module>\n    from . import utils\nE     File \"/testbed/requests/utils.py\", line 362\nE       decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')\nE                                                                           ^\nE   IndentationError: unindent does not match any outer indentation level\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-6116",
+      "passed": false,
+      "time_seconds": 57.2,
+      "error": " usage: pytest.py [options] [file_or_dir] [file_or_dir] [...]\npytest.py: error: unrecognized arguments: --co\n  inifile: None\n  rootdir: /tmp/pytest-of-root/pytest-0/test_pytest_fs_collect_hooks_are_seen0\n\n=========================== short test summary info ============================\nFAILED testing/test_collection.py::TestCustomConftests::test_pytest_fs_collect_hooks_are_seen\n1 failed in 0.14s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7220",
+      "passed": false,
+      "time_seconds": 73.0,
+      "error": "File \"/testbed/src/_pytest/_code/code.py\", line 811, in repr_traceback\nINTERNALERROR>     reprentry = self.repr_traceback_entry(entry, einfo)\nINTERNALERROR>   File \"/testbed/src/_pytest/_code/code.py\", line 778, in repr_traceback_entry\nINTERNALERROR>     path = self._makepath(entry.path)\nINTERNALERROR> AttributeError: 'FormattedExcinfo' object has no attribute '_makepath'\n\nno tests ran in 0.04s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-8365",
+      "passed": false,
+      "time_seconds": 80.5,
+      "error": "r\n    self._accessor.mkdir(self, mode)\nE   FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pytest-of-os/<:*?;>agnostic'\n=========================== short test summary info ============================\nFAILED testing/test_tmpdir.py::test_tmp_path_factory_handles_invalid_dir_characters\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.07s\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-863",
+      "passed": true,
+      "time_seconds": 92.5,
+      "error": ""
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5413",
+      "passed": false,
+      "time_seconds": 78.4,
+      "error": "_str\n    assert str(excinfo) == \"<ExceptionInfo ValueError tblen=4>\"\nE   AssertionError: assert 'ValueError' == '<ExceptionInfo ValueError tblen=4>'\nE     - ValueError\nE     + <ExceptionInfo ValueError tblen=4>\n=========================== short test summary info ============================\nFAILED testing/code/test_excinfo.py::test_excinfo_repr_str - AssertionError: ...\n1 failed in 0.13 seconds\n\n\n"
+    },
+    {
+      "instance_id": "pallets__flask-4992",
+      "passed": false,
+      "time_seconds": 76.4,
+      "error": "ftest '/testbed/tests/conftest.py'.\ntests/conftest.py:9: in <module>\n    from flask import Flask\nsrc/flask/__init__.py:2: in <module>\n    from .app import Flask as Flask\nsrc/flask/app.py:35: in <module>\n    from .config import Config\nE     File \"/testbed/src/flask/config.py\", line 278\nE       e.strerror = f\"Unable to load configuration file ({e.strerror})\"\nE   IndentationError: unexpected indent\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5495",
+      "passed": false,
+      "time_seconds": 79.3,
+      "error": ".py::TestAssert_reprcompare::test_bytes_diff_normal\n(no name '/testbed/testing/test_assertion.py::TestAssert_reprcompare::test_bytes_diff_normal' in any of [<Instance ()>])\n\nERROR: not found: /testbed/testing/test_assertion.py::TestAssert_reprcompare::test_bytes_diff_verbose\n(no name '/testbed/testing/test_assertion.py::TestAssert_reprcompare::test_bytes_diff_verbose' in any of [<Instance ()>])\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7168",
+      "passed": false,
+      "time_seconds": 144.5,
+      "error": "urn cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))\n  File \"/opt/miniconda3/envs/testbed/lib/python3.9/site-packages/anthropic/_base_client.py\", line 1137, in request\n    raise self._make_status_error_from_response(err.response) from None\nanthropic.InternalServerError: Error code: 500 - {'error': {'message': 'HTTP Error 400: Bad Request', 'type': 'proxy_error'}}\n"
+    },
+    {
+      "instance_id": "pallets__flask-5063",
+      "passed": false,
+      "time_seconds": 135.0,
+      "error": "\nE    +  where 'Endpoint  Methods  Rule\\n--------  -------  ----\\na         GET      /a\\nb         GET      /b\\n' = <Result okay>.output\n=========================== short test summary info ============================\nFAILED tests/test_cli.py::TestRoutes::test_subdomain - AssertionError: assert...\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.08s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-9359",
+      "passed": false,
+      "time_seconds": 103.2,
+      "error": ")\nE   AssertionError: assert '@foo' in '    pass'\nE    +  where '    pass' = str(<_pytest._code.source.Source object at 0x7f89009c5ca0>)\n=========================== short test summary info ============================\nFAILED testing/code/test_source.py::test_decorator - AssertionError: assert '...\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.07s\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-11143",
+      "passed": false,
+      "time_seconds": 52.1,
+      "error": "PATCH_LINES: 16\nPYTEST_RC: 4\n\nno tests ran in 0.11s\n\nERROR: not found: /testbed/testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring\n(no name '/testbed/testing/test_assertrewrite.py::TestIssue11140::test_constant_not_picked_as_module_docstring' in any of [<Module testing/test_assertrewrite.py>])\n\n\n"
+    },
+    {
+      "instance_id": "pytest-dev__pytest-11148",
+      "passed": false,
+      "time_seconds": 57.0,
+      "error": "revious_imports' from '/tmp/pytest-of-root/pytest-0/test_remembers_previous_import0/_src/tests/mymod_test_remembers_previous_imports.py'>\n=========================== short test summary info ============================\nFAILED testing/test_pathlib.py::TestImportPath::test_remembers_previous_imports\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed in 0.10s\n\n\n"
+    },
+    {
+      "instance_id": "pallets__flask-4045",
+      "passed": false,
+      "time_seconds": 65.3,
+      "error": "_init__\n    raise ValueError(\"Blueprint names should not contain dots\")\nE   ValueError: Blueprint names should not contain dots\n=========================== short test summary info ============================\nFAILED tests/test_blueprints.py::test_route_decorator_custom_endpoint_with_dots\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed, 1 passed in 0.05s\n\n\n"
+    },
+    {
+      "instance_id": "psf__requests-1963",
+      "passed": false,
+      "time_seconds": 93.9,
+      "error": "   if isinstance(hook, collections.Callable):\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED test_requests.py::TestRedirects::test_requests_are_updated_each_time\n!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!\n1 failed, 6 passed, 10 warnings in 6.02s\n\n\n"
+    }
+  ]
+}
